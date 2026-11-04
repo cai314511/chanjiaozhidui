@@ -1,0 +1,9 @@
+.venv/
+runtime/
+data/private/
+outputs/
+__pycache__/
+.pytest_cache/
+.env
+_run_*.py
+*.baiduyun.p.downloading

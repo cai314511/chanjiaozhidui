@@ -1,0 +1,38 @@
+from playwright.sync_api import expect
+
+from tests.test_browser import browser_system, register, route
+
+
+def test_glass_commands_focus_and_voice_lifecycle(browser_system):
+    browser, base = browser_system
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000}, reduced_motion='reduce')
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    register(page, base, 'student', 'glass-student')
+    expect(page.locator('.nav-capsule')).to_have_count(1)
+    assert '比赛' not in page.locator('#page-content').inner_text()
+    page.keyboard.press('Alt+Space')
+    expect(page.locator('#command-panel')).to_be_visible()
+    page.locator('#command-panel input').fill('资料')
+    expect(page.locator('#command-results mark')).to_have_text('资料')
+    page.keyboard.press('Enter')
+    expect(page.locator('#page-content')).to_contain_text('资料与证据库')
+    page.locator('.expand-module').first.click()
+    expect(page.locator('#focus-stage')).to_be_visible()
+    expect(page.locator('#module-dock')).to_be_visible()
+    page.keyboard.press('Escape')
+    expect(page.locator('#focus-stage')).not_to_be_visible()
+    route(page, 'profile')
+    assert page.locator('#profile-form input[type=number]:visible').count() == 0
+    page.locator('[data-action=voice-intro]').first.click()
+    expect(page.locator('.droplet')).to_be_visible()
+    expect(page.locator('#voice-transcript')).to_be_visible()
+    page.locator('#voice-transcript').fill('我完成了一次用户调研，独立整理了访谈记录。')
+    page.locator('#voice-send').click()
+    expect(page.locator('#voice-error')).to_contain_text('DeepSeek')
+    page.locator('[data-action=close-modal]').click()
+    expect(page.locator('#modal')).not_to_be_visible()
+    page.set_viewport_size({'width': 390, 'height': 844})
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    assert errors == []
+    page.close()

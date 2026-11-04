@@ -1,0 +1,32 @@
+{
+  "program": {
+    "code": "",
+    "name": "",
+    "region": "",
+    "current_seats": null,
+    "completion_rate": null,
+    "pipeline_graduates": [null, null, null],
+    "current_direction_counts": {},
+    "skills": {},
+    "courses": [],
+    "constraints": {
+      "credits_min": null,
+      "credits_max": null,
+      "hours_min": null,
+      "hours_max": null,
+      "general_credits_min": null,
+      "professional_credits_min": null,
+      "teacher_hours_max": null,
+      "lab_hours_max": null,
+      "budget": null
+    },
+    "directions": [],
+    "groups": [],
+    "split_timing": ""
+  },
+  "actions": [],
+  "admissions": {
+    "min_seats": null,
+    "max_seats": null
+  }
+}

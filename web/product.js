@@ -1,0 +1,60 @@
+import {state,e,fmt,api,post,put,on,toast,button,heading,empty,field,values,refresh,navigate,dialog,closeDialog} from './core.js';
+import {openAssistant} from './assistant.js';
+import {dictateInto} from './voice.js';
+
+export function bindInputHelpers(root=document){
+ root.querySelectorAll('textarea:not([data-input-help])').forEach(textarea=>{
+  if(textarea.id==='voice-transcript'||textarea.closest('#agent-form'))return;
+  textarea.dataset.inputHelp='1';
+  const controls=document.createElement('div');controls.className='input-hub input-assist';
+  const speech=document.createElement('button');speech.type='button';speech.className='btn small';speech.textContent='◉ 语音输入';speech.onclick=()=>dictateInto(textarea,speech).catch(err=>toast(err.message));
+  const label=document.createElement('label');label.className='btn small';label.textContent='＋ 从文档填写';
+  const input=document.createElement('input');input.type='file';input.accept='.pdf,.docx,.txt,.md,.csv,.xlsx';input.hidden=true;label.append(input);
+  input.onchange=async()=>{if(!input.files[0])return;const epoch=state.sessionEpoch,file=input.files[0],body=new FormData();body.append('file',file);input.disabled=true;
+   try{const uploaded=await api('/documents',{method:'POST',body}),doc=await api('/documents/'+uploaded.id);await refresh();if(epoch!==state.sessionEpoch||!textarea.isConnected)return;
+    const text=doc.blocks.map(b=>b.text).join('\n\n'),prefix=textarea.value?textarea.value+'\n\n':'';
+    const limit=textarea.maxLength>0?textarea.maxLength:50000;textarea.value=(prefix+text).slice(0,limit);
+    toast(prefix.length+text.length>limit?'正文超出当前输入长度，全文已保存到资料库':'文档已填入，请核对后保存');textarea.dispatchEvent(new Event('input',{bubbles:true}));
+   }catch(err){toast(err.message);}finally{input.disabled=false;input.value='';}
+  };
+  controls.append(speech,label);textarea.after(controls);
+ });
+}
+export function installInputHelpers(){const observer=new MutationObserver(()=>bindInputHelpers());observer.observe(document.querySelector('#app'),{childList:true,subtree:true});observer.observe(document.querySelector('#modal-content'),{childList:true,subtree:true});}
+
+export function inputHub(){return `<div class="input-hub">${button('＋ 上传资料','upload')}${button('◉ 语音讲述','voice-intro')}${button('↗ 导入个人网站','website')}${button('▧ 上传作品 / 视频','portfolio-upload')}</div>`;}
+export function productHome(original){
+ const quick=state.user?`<section class="panel quick-start"><div><h3>${state.user.role==='student'?'从一段经历，开始了解你的方向':state.user.role==='employer'?'把岗位需求交给智能助手整理':'从培养材料开始，发现调整方向'}</h3><p class="hint">${state.user.role==='student'?'上传简历，或聊聊你做过的事情。资料整理后由你确认。':'上传文档或语音说明目标，减少重复填写。'}</p></div>${button('◉ 开始交谈','voice-intro','','primary')}${button('上传资料','upload')}</section>`:'';
+ return quick+original.replaceAll('调整能力权重','调整招聘偏好').replaceAll('权重可调 · 评分可复算','结合经历 · 双向选择').replaceAll('匹配模型','匹配方式');
+}
+export async function profilePage(draft=null){
+ const p=draft||await api('/profile');state.profile=p;
+ return heading('让机会了解你','先上传简历或聊一段经历，只确认重要信息。')+inputHub()+`<form id="profile-form"><section class="panel"><h3>你的方向</h3><div class="grid2">${field('所学专业','major',p.major)}${field('学校','school_name',p.school_name)}</div>${field('想从事什么工作？','career',p.career,'textarea')}${field('值得介绍的一段经历','experience',p.experience,'textarea')}<p class="hint">可以使用上方语音入口，也可以让助手根据你选择的材料整理。</p>${button('从材料整理个人介绍','profile-assistant','','gold-btn')}</section><section class="panel"><h3>已整理的经历证据</h3>${Object.entries(p.abilities||{}).length?Object.entries(p.abilities).map(([skill,value])=>`<div class="source-block"><span>${e(skill)}</span><p>${e(value.evidence||'等待补充具体经历')}</p></div>`).join(''):empty('经历会逐渐清晰','上传简历或完成一次访谈后，在这里核对系统整理的内容。')}<details><summary>工作偏好与学习安排</summary><div class="grid2">${field('希望工作的城市，逗号分隔','cities',p.preferences?.cities?.join('，'))}${field('期望月薪（元，可不填写）','salary_target',p.preferences?.salary_target||'','number','min="0"')}${field('语言能力','language',p.language)}${field('高校入校码（可选）','school_code',p.school_code||'')}${field('学习预算（元）','resource_budget',p.resources?.budget||0,'number','min="0"')}${field('可投入学习课时','resource_study_hours',p.resources?.study_hours||0,'number','min="0"')}${field('完成期限（月）','resource_months',p.resources?.months||0,'number','min="0" max="120"')}</div></details></section><div class="form-actions"><button type="submit" class="btn primary">确认并保存</button></div></form>`;
+}
+export function bindProfile(){
+ const form=document.querySelector('#profile-form');if(!form)return;
+ form.addEventListener('submit',async event=>{event.preventDefault();const values=Object.fromEntries(new FormData(form)),p=state.profile;
+  const payload={major:values.major,school_name:values.school_name,career:values.career,experience:values.experience,language:values.language,school_code:values.school_code,abilities:p.abilities||{},preferences:{...p.preferences,cities:values.cities.split(/[，,]/).map(v=>v.trim()).filter(Boolean),salary_target:Number(values.salary_target||0)},resources:{budget:Number(values.resource_budget||0),study_hours:Number(values.resource_study_hours||0),months:Number(values.resource_months||0)}};
+  try{await put('/profile',payload);toast('画像已保存；你可以继续补充经历');}catch(err){toast(err.message);}
+ });
+}
+export function weightsPage(){const jobs=state.jobs.filter(j=>j.owner===state.user.id);return heading('招聘偏好','选择你更关注的能力，系统会更新候选人的匹配结果。')+(jobs.length?`<div class="toolbar"><select class="control" id="weight-select" aria-label="选择岗位">${jobs.map(j=>`<option value="${j.id}">${e(j.title)}</option>`).join('')}</select></div><div id="weight-workspace"></div>`:empty('先发布一个岗位','你可以上传JD，由助手整理岗位草稿。',button('上传JD','upload')));}
+export async function loadWeights(id){const j=state.jobs.find(j=>j.id===id);if(!j)return;document.querySelector('#weight-workspace').innerHTML=`<form id="priority-form" class="panel"><h3>${e(j.title)}</h3>${j.requirements.map((r,i)=>`<label class="priority-row"><span>${e(r.skill)}${r.mandatory?' · 必要条件':''}</span><select class="control" name="p${i}">${['一般关注','重点关注','优先考虑'].map(label=>`<option ${(j.priorities?.[r.skill]||'重点关注')===label?'selected':''}>${label}</option>`).join('')}</select></label>`).join('')}<div class="form-actions"><button class="btn primary" type="submit">更新招聘偏好</button></div><p class="hint">必要条件持续生效。更新后，学生的匹配结果会随之变化。</p></form>`;
+ document.querySelector('#priority-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;try{await put('/jobs/'+id+'/priorities',{version:j.version,priorities:Object.fromEntries(j.requirements.map((r,i)=>[r.skill,form.elements['p'+i].value]))});await refresh();toast('招聘偏好已更新');await loadWeights(id);}catch(err){toast(err.message);}});
+}
+export function guidancePage(){return heading('使用帮助','从真实经历与岗位需求出发，逐步完成双向选择。')+`<div class="grid2"><article class="panel"><h3>上传，交谈，再确认</h3><p class="hint">简历、成绩单、工作经历和作品可以帮助整理个人介绍。语音在这台电脑完成识别，转写可以编辑后提交。</p></article><article class="panel"><h3>如何理解匹配结果</h3><p class="hint">匹配度结合岗位需求、经历材料和双方偏好。资料尚未核实时会标记待核实；你可以补充材料或联系企业复核。</p></article><article class="panel"><h3>谁能查看你的材料</h3><p class="hint">资料默认归你所有。投递时选择开放的文档与作品，撤回投递后企业失去访问权限。高校查看符合样本要求的汇总。</p></article><article class="panel"><h3>规划培养与资源</h3><p class="hint">高校可以结合岗位需求、课程、师资和实验室条件比较调整方案。数据管理与审查资料位于高校管理入口。</p></article></div>`;}
+export function businessCharts(){
+ const root=document.querySelector('#page-content');if(state.route!=='home'||!state.user)return;
+ const counts=['AI产品','金融科技'].map(name=>({name,value:state.jobs.filter(j=>j.industry===name).length}));
+ const total=counts.reduce((s,c)=>s+c.value,0);
+ if(!total)return;
+ const max=Math.max(...counts.map(c=>c.value),1);
+ root.insertAdjacentHTML('beforeend',`<div class="grid2"><section class="panel"><h3>岗位方向</h3><div class="inline"><div class="chart-ring" style="--value:${counts[0].value/total*100}%"><strong>${total}</strong></div><div><p class="hint">来自站内已发布岗位</p><div class="chart-legend"><span><i class="chart-key"></i>AI产品 ${counts[0].value}</span><span><i class="chart-key gold"></i>金融科技 ${counts[1].value}</span></div></div></div></section><section class="panel"><h3>行业机会分布</h3><div class="chart-bars" role="img" aria-label="${counts.map(c=>c.name+c.value+'个岗位').join('，')}">${counts.map(c=>`<div class="chart-column"><strong>${c.value}</strong><i style="--height:${c.value/max*100}px"></i><span>${c.name}</span></div>`).join('')}</div></section></div>`);
+ // CSP 下通过 DOM 属性设置图表变量。
+ root.querySelector('.chart-ring')?.style.setProperty('--value',counts[0].value/total*100+'%');
+ root.querySelectorAll('.chart-column i').forEach((el,i)=>el.style.setProperty('--height',counts[i].value/max*100+'px'));
+}
+on('profile-assistant',()=>openAssistant({mode:'profile'}));
+on('website',()=>{dialog('从个人网站导入经历',`<form id="website-form">${field('个人网站 HTTPS 地址','url','','url','required')}<p class="hint">只读取你提供的公开页面正文，导入到自己的资料库，不自动发送给模型。</p><button class="btn primary" type="submit">导入网页正文</button><p class="error-text" id="website-error"></p></form>`);document.querySelector('#website-form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,btn=form.querySelector('button');btn.disabled=true;try{await post('/portfolio/website',{text:form.url.value});await refresh();closeDialog();navigate('documents');toast('网站正文已导入');}catch(err){document.querySelector('#website-error').textContent=err.message;}finally{btn.disabled=false;}};});
+on('portfolio-upload',()=>{dialog('上传作品与视频',`<form id="portfolio-form"><div class="field"><label>选择作品<input type="file" name="file" accept=".mp4,.webm,.mp3,.wav,.png,.jpg,.jpeg,.txt" required></label></div><p class="hint">最大60MB，保存在本地私有资料库。视频供授权后的企业播放复核，当前不会自动分析画面。</p><button type="submit" class="btn primary">保存作品</button><p id="portfolio-error" class="error-text"></p></form>`);document.querySelector('#portfolio-form').onsubmit=async event=>{event.preventDefault();const btn=event.currentTarget.querySelector('button');btn.disabled=true;try{await api('/portfolio',{method:'POST',body:new FormData(event.currentTarget)});closeDialog();navigate('documents');toast('作品已保存');}catch(err){document.querySelector('#portfolio-error').textContent=err.message;}finally{btn.disabled=false;}};});
+export async function appendPortfolio(){const target=document.querySelector('#page-content');if(state.route!=='documents')return;const epoch=state.sessionEpoch,items=await api('/portfolio');if(epoch!==state.sessionEpoch||state.route!=='documents')return;target.insertAdjacentHTML('beforeend',`<section class="panel"><h3>作品与视频</h3>${inputHub()}${items.length?`<div class="portfolio-grid">${items.map(item=>`<article class="panel"><h4>${e(item.name)}</h4>${item.mime.startsWith('video/')?`<video controls preload="metadata" src="/api/portfolio/${item.id}/file"></video>`:item.mime.startsWith('image/')?`<img src="/api/portfolio/${item.id}/file" alt="${e(item.name)}">`:item.mime.startsWith('audio/')?`<audio controls src="/api/portfolio/${item.id}/file"></audio>`:`<a class="btn" href="/api/portfolio/${item.id}/file" target="_blank" rel="noopener">打开作品</a>`}</article>`).join('')}</div>`:empty('还没有作品','上传项目成果、演示视频或作品图片。')}</section>`);}

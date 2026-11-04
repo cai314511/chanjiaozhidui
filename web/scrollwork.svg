@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <g id="vine" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M320 322C282 282 245 255 213 214C181 173 190 123 230 115C265 108 286 143 270 168C258 187 237 182 236 168C235 158 246 153 251 160"/>
+      <path d="M213 214C191 201 160 205 144 184C121 154 149 128 167 141C181 150 173 167 164 162"/>
+      <path d="M218 218C223 189 199 184 188 168C184 191 196 208 218 218Z"/>
+      <path d="M247 251C270 243 286 225 281 203C261 209 247 226 247 251Z"/>
+      <path d="M266 270C238 271 220 253 220 234C242 237 258 249 266 270Z"/>
+      <path d="M201 194C179 178 174 157 185 140C197 154 204 172 201 194Z"/>
+      <path d="M303 303C294 270 305 247 322 244C321 267 313 290 303 303Z"/>
+      <path d="M146 183C126 182 116 173 110 158C129 155 143 165 146 183Z"/>
+      <path d="M286 285C260 296 239 291 230 277C248 270 267 274 286 285Z"/>
+      <path d="M228 114C225 99 236 84 251 83C253 98 244 110 228 114Z"/>
+    </g>
+    <g id="ornament">
+      <use href="#vine"/>
+      <use href="#vine" transform="translate(640 0) scale(-1 1)"/>
+      <use href="#vine" transform="translate(0 640) scale(1 -1)"/>
+      <use href="#vine" transform="translate(640 640) scale(-1 -1)"/>
+      <path d="M320 292Q333 312 348 320Q333 328 320 348Q307 328 292 320Q307 312 320 292Z"/>
+      <path d="M320 303L337 320L320 337L303 320Z"/>
+      <circle cx="320" cy="320" r="4"/>
+    </g>
+  </defs>
+  <use href="#ornament" transform="translate(0 1.6)" stroke="#fffefa" stroke-width="2.5" opacity=".72"/>
+  <use href="#ornament" stroke="#b6a37c" stroke-width="1.1" opacity=".14"/>
+</svg>
