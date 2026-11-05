@@ -57,6 +57,7 @@ on('go-jobs',()=>navigate('jobs'));
 on('go-curriculum',()=>navigate('curriculum'));
 on('close-modal',closeDialog);
 on('login',()=>auth('login'));
+on('admin-login',()=>{auth('login');document.querySelector('.dialog-head h2').textContent='管理员登录'});
 on('register',()=>auth('register'));
 on('logout',async()=>{await post('/auth/logout',{});resetIdentity();state.user=null;state.jobs=[];state.applications=[];state.documents=[];navigate('home');});
 on('auth-tab',el=>auth(el.dataset.id));

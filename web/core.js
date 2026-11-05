@@ -8,12 +8,14 @@ export const num = value => Number(value || 0);
 export const fmt = value => Number(value ?? 0).toLocaleString('zh-CN',{maximumFractionDigits:1});
 export const money = value => '¥'+fmt(value);
 export const roleNames = {employer:'企业端',student:'学生端',university:'高校端'};
+Object.defineProperty(roleNames,'admin',{value:'管理员',enumerable:false});
 export const statusNames = {eligible:'核验完成',pending:'待核实',excluded:'必要条件未满足'};
 let toastTimer;
 export function toast(message){const el=document.querySelector('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),5000);}
 export async function api(path,options={}){
   const epoch=state.sessionEpoch;
   const headers={...(options.body instanceof FormData?{}:{'Content-Type':'application/json'}),...options.headers};
+  if(state.user)headers['X-Workspace-ID']=state.user.id;
   const response=await fetch('/api'+path,{credentials:'same-origin',...options,headers});
   const data=await response.json();
   if(epoch!==state.sessionEpoch)throw new DOMException('账号会话已变化','AbortError');
@@ -40,6 +42,7 @@ export function values(form){return Object.fromEntries(new FormData(form));}
 export function getJob(id){return state.jobs.find(j=>j.id===id);}
 export async function refresh(){
   if(!state.user)return;
+  if(state.user.role==='admin'){state.jobs=[];state.documents=[];state.applications=[];return;}
   const requests=[api('/jobs'),api('/documents')];
   if(state.user.role!=='university')requests.push(api('/applications'));
   const result=await Promise.all(requests);state.jobs=result[0];state.documents=result[1];state.applications=result[2]||[];

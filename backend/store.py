@@ -38,6 +38,7 @@ class Store:
                     id TEXT PRIMARY KEY, username TEXT UNIQUE, name TEXT, role TEXT,
                     salt TEXT, hash TEXT, school_code TEXT, created TEXT);
                 CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT, expires REAL);
+                CREATE TABLE IF NOT EXISTS admin_contexts (token TEXT PRIMARY KEY, target_id TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS entities (
                     id TEXT PRIMARY KEY, kind TEXT, owner TEXT, data TEXT, created TEXT, updated TEXT);
                 CREATE INDEX IF NOT EXISTS entity_kind ON entities(kind, owner);

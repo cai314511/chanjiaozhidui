@@ -7,3 +7,5 @@ __pycache__/
 .env
 _run_*.py
 *.baiduyun.p.downloading
+比赛数据/
+.DS_Store

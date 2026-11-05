@@ -38,6 +38,8 @@ def create_app(data_root=None):
                 from fastapi.responses import JSONResponse
                 return JSONResponse({"detail": "请求来源不匹配"}, status_code=403)
         response = await call_next(request)
+        if request.method not in {'GET', 'HEAD', 'OPTIONS'} and response.status_code < 400 and getattr(request.state, 'administrator', None):
+            store.audit(request.state.administrator, 'workspace:' + request.method + ':' + request.url.path, request.state.workspace)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["X-Frame-Options"] = "DENY"
@@ -57,12 +59,27 @@ def create_app(data_root=None):
         return {key: row[key] for key in ("id", "username", "name", "role", "school_code")}
 
     def user(request: Request):
-        token = request.cookies.get("chanzhi_session", "")
+        from backend.administration import principal
+        row, token = principal(store, request)
+        actor = row
         with store.connect() as db:
-            row = db.execute("SELECT u.* FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?", (hashlib.sha256(token.encode()).hexdigest(), time.time())).fetchone()
-        if row is None:
-            raise HTTPException(401, "请先登录")
-        return public_user(row)
+            context = db.execute('SELECT target_id FROM admin_contexts WHERE token=?', (token,)).fetchone() if actor['role'] == 'admin' else None
+            if context:
+                row = db.execute('SELECT * FROM users WHERE id=?', (context['target_id'],)).fetchone()
+                if row is None:
+                    raise HTTPException(409, '工作空间账号已不存在，请返回管理入口')
+        result = public_user(row)
+        expected = request.headers.get('X-Workspace-ID')
+        if expected and expected != row['id'] and not request.url.path.startswith('/api/auth/'):
+            raise HTTPException(409, '工作空间已切换，请刷新页面后继续')
+        if context:
+            result['administrator'] = {'id': actor['id'], 'name': actor['name']}
+            request.state.administrator = actor['id']
+            request.state.workspace = row['id']
+        return result
+
+    from backend.administration import attach_administration
+    attach_administration(app, store, user, public_user)
 
     def role(current, required):
         if current["role"] not in required:
@@ -176,6 +193,7 @@ def create_app(data_root=None):
         token = request.cookies.get("chanzhi_session", "")
         with store.connect() as db:
             db.execute("DELETE FROM sessions WHERE token=?", (hashlib.sha256(token.encode()).hexdigest(),))
+            db.execute('DELETE FROM admin_contexts WHERE token=?', (hashlib.sha256(token.encode()).hexdigest(),))
         response.delete_cookie("chanzhi_session")
         return {"ok": True}
 
