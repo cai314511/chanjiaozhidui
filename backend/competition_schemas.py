@@ -28,7 +28,7 @@ class Skill(Model):
 class Recruitment(Model):
     record_id: str = Field(min_length=1, max_length=100)
     title: str = Field(min_length=1, max_length=200)
-    industry: Literal["AI产品", "金融科技"]
+    industry: str = Field(min_length=1, max_length=100)
     category: str = Field(min_length=1, max_length=100)
     region: str = Field(min_length=1, max_length=100)
     month: str

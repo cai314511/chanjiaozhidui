@@ -17,11 +17,10 @@ def test_glass_commands_focus_and_voice_lifecycle(browser_system):
     expect(page.locator('#command-results mark')).to_have_text('资料')
     page.keyboard.press('Enter')
     expect(page.locator('#page-content')).to_contain_text('资料与证据库')
-    page.locator('.expand-module').first.click()
-    expect(page.locator('#focus-stage')).to_be_visible()
-    expect(page.locator('#module-dock')).to_be_visible()
-    page.keyboard.press('Escape')
-    expect(page.locator('#focus-stage')).not_to_be_visible()
+    # 已确认取消卡片放大与模块缩略条；普通导航、弹窗和语音继续可用。
+    expect(page.locator('.expand-module')).to_have_count(0)
+    expect(page.locator('#focus-stage')).to_have_count(0)
+    expect(page.locator('#module-dock')).to_have_count(0)
     route(page, 'profile')
     assert page.locator('#profile-form input[type=number]:visible').count() == 0
     page.locator('[data-action=voice-intro]').first.click()

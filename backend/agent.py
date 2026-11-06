@@ -25,7 +25,7 @@ def configuration():
             "base": "https://api.deepseek.com"}
 
 
-RULES = """产教智对 matching-1：企业能力达标率 min(1,level/target)，企业权重归一化。
+RULES = """智链产教 matching-1：企业能力达标率 min(1,level/target)，企业权重归一化。
 已核实能力贡献下界，未核实贡献下界0、上界1。证据覆盖率为已核实权重之和。
 暂定分来自自述，不能称为核实分。学生偏好分独立计算，综合分为调和平均2ES/(E+S)。
 必要条件独立阻断。课程优化采用多资源约束整数规划与缺口饱和收益。
@@ -73,11 +73,11 @@ def run_agent(message, context):
     config = configuration()
     if not config["key"]:
         raise AgentError("DeepSeek密钥尚未配置，请检查本项目.env或参考项目本地配置")
-    instructions = """你是产教智对的统一Agent调度器，使用中文。按任务组织产业情报、岗位解析、高校画像、匹配诊断、培养决策。
+    instructions = """你是智链产教的统一Agent调度器，使用中文。按任务组织产业情报、岗位解析、高校画像、匹配诊断、培养决策。
 先使用工具读取已授权资料；需要文档时读取documents，需要评分时calculate_matching。
 只报告工具实际提供的信息。不要展示内部思维过程；提供简明执行依据、缺失信息和引用位置。
 最终输出JSON对象：{"message":"中文答复", "draft":null}。
-job模式可在draft返回完整岗位草稿：title,industry(仅AI产品/金融科技),city,work_mode(现场/混合/远程),salary_min,salary_max,capacity,description,training_cost,mentor_hours,hard{majors:[],schools:[],languages:[]},requirements[{skill,target:1到5,weight:非负,mandatory:false,category}],questions[{id,title,kind:text/voice/scenario,skill,rubric}]。
+job模式可在draft返回完整岗位草稿：title,industry(材料支持的行业或赛道名称),city,work_mode(现场/混合/远程),salary_min,salary_max,capacity,description,training_cost,mentor_hours,hard{majors:[],schools:[],languages:[]},requirements[{skill,target:1到5,weight:非负,mandatory:false,category}],questions[{id,title,kind:text/voice/scenario,skill,rubric}]。
 未知岗位必填条件应在message询问，draft=null，不擅自补薪资或工作地点。
 profile模式可返回完整学生画像草稿：major,school_name,language,career,experience,abilities:{技能:{level:0到5,evidence:原文位置}},preferences:{salary_target,cities:[],industries:[],work_modes:[],goals:[],salary_hard:false,city_hard:false,weights:{salary:25,city:20,industry:20,work_mode:10,development:25}}。只有材料支持的能力才填，资料缺失不打分。
 assessment模式在message逐项给出题目、回答证据、建议等级；draft=null。不能自动确认。

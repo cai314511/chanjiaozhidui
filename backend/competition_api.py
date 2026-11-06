@@ -299,7 +299,7 @@ def attach_competition(app, store, user, role, owned, entity, flat):
             output, media = '\ufeff' + stream.getvalue(), 'text/csv'
         else:
             raise HTTPException(422, '支持json、csv和md导出')
-        return Response(output, media_type=media, headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote('产教智对分析.' + format)})
+        return Response(output, media_type=media, headers={'Content-Disposition': "attachment; filename*=UTF-8''" + quote('智链产教分析.' + format)})
 
     @app.post('/api/competition/runs/{ident}/evaluate/{dataset_id}')
     def evaluate(ident: str, dataset_id: str, current=Depends(user)):

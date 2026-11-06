@@ -104,6 +104,9 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
     def portfolio_access(ident, current):
         item = entity(ident, 'portfolio')
         if item['owner'] != current['id']:
+            from backend.student_space import published_resource
+            if published_resource(store, item['owner'], ident, 'portfolio'):
+                return item
             shared = any(not row['data'].get('withdrawn') and ident in row['data'].get('portfolio_ids', [])
                          and entity(row['data']['job_id'], 'job')['owner'] == current['id']
                          for row in store.list('application', item['owner']))

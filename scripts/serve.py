@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="启动或停止产教智对本地服务")
+    parser = argparse.ArgumentParser(description="启动或停止智链产教本地服务")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--background", action="store_true")
     parser.add_argument("--stop", action="store_true")
@@ -61,7 +61,7 @@ def main():
                     raise SystemExit("服务启动失败，请查看runtime/server/server.log")
                 try:
                     response = client.get(f"http://127.0.0.1:{args.port}/api/health")
-                    ready = response.status_code == 200 and response.json().get("name") == "产教智对"
+                    ready = response.status_code == 200 and response.json().get("name") == "智链产教"
                 except httpx.HTTPError:
                     ready = False
                 if ready:

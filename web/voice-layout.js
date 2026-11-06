@@ -13,7 +13,7 @@ export function arrangeVoice(modal) {
  history.onclick=()=>{const expanded=messages.classList.toggle('show-history');history.setAttribute('aria-expanded',String(expanded));history.textContent=expanded?'返回当前对话':'查看对话记录';messages.scrollTop=messages.scrollHeight};
  conversation.append(messages,history,field,error);
  root.replaceChildren(stage,status,conversation,footer);
- modal.querySelector('.dialog-head h2').textContent='产教智对 · 语音空间';
+ modal.querySelector('.dialog-head h2').textContent='智链产教 · 语音空间';
  const microphone=modal.querySelector('#voice-mic');
  microphone.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
  microphone.setAttribute('aria-pressed','false');

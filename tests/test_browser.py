@@ -34,16 +34,21 @@ def browser_system():
     sock.close()
 
 
-def register(page, base, role, name):
+def register(page, base, role, name, dismiss_exploration=True):
     page.goto(base)
-    page.locator('[data-action="register"]').click()
+    page.locator('.topbar [data-action="register"]').click()
     form = page.locator('#auth-form')
     form.locator('[name=username]').fill(name)
     form.locator('[name=password]').fill('browser-test-1234')
     form.locator('[name=name]').fill(name)
     form.locator('[name=role]').select_option(role)
+    if role == 'employer':
+        form.locator('#company-track-input').fill('AI产品')
     form.locator('[type=submit]').click()
     expect(page.locator('#modal')).not_to_be_visible()
+    if role == 'student' and dismiss_exploration:
+        expect(page.locator('#exploration-dialog')).to_be_visible()
+        page.locator('[data-action=explore-skip][aria-label="跳过探索"]').click()
 
 
 def route(page, name):
@@ -141,7 +146,7 @@ def test_real_browser_three_surfaces_and_live_weights(browser_system):
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         page.set_viewport_size({"width": 390, "height": 844})
         page.reload()
-        expect(page.locator('.hero')).to_be_visible()
+        expect(page.locator('#discovery-form')).to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         page.locator('[data-action="mobile-menu"]').click()
         expect(page.locator('#sidebar')).to_have_class('sidebar open')

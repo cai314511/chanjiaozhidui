@@ -95,7 +95,7 @@ def analyze(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='产教智对可复核数据处理与专业决策；默认本地计算，不调用外部模型')
+    parser = argparse.ArgumentParser(description='智链产教可复核数据处理与专业决策；默认本地计算，不调用外部模型')
     commands = parser.add_subparsers(dest='command', required=True)
     normalize_parser = commands.add_parser('normalize', help='校验来源、映射字段并规范化')
     normalize_parser.add_argument('--source', required=True)

@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def create_app(data_root=None):
-    app = FastAPI(title="产教智对", docs_url="/api/docs", redoc_url=None)
+    app = FastAPI(title="智链产教", docs_url="/api/docs", redoc_url=None)
     store = Store(Path(data_root) if data_root else ROOT / "data" / "private")
     app.state.store = store
     attempts = {}
@@ -150,6 +150,9 @@ def create_app(data_root=None):
         document = entity(ident, "document")
         if document["owner"] == current["id"]:
             return document
+        from backend.student_space import published_resource
+        if published_resource(store, document['owner'], ident, 'document'):
+            return document
         if current["role"] == "employer":
             for item in store.list("application", document["owner"]):
                 if not item["data"].get("withdrawn") and ident in item["data"].get("document_ids", []):
@@ -172,6 +175,10 @@ def create_app(data_root=None):
         try:
             with store.connect() as db:
                 db.execute("INSERT INTO users VALUES(?,?,?,?,?,?,?,?)", (ident, payload.username.lower(), payload.name, payload.role, salt, password_hash(payload.password, salt), code, now()))
+                if payload.role == 'employer':
+                    stamp = now()
+                    db.execute('INSERT INTO entities VALUES(?,?,?,?,?,?)', (uid(), 'company_profile', ident,
+                        encode({'name': payload.name, 'tracks': payload.company_tracks, 'description': ''}), stamp, stamp))
         except sqlite3.IntegrityError:
             raise HTTPException(409, "账号已存在")
         session(response, ident)
@@ -205,7 +212,7 @@ def create_app(data_root=None):
     def health():
         from backend.agent import configuration
         config = configuration()
-        return {"status": "ok", "name": "产教智对", "model_version": "matching-1", "agent_configured": bool(config["key"]), "agent_model": config["model"]}
+        return {"status": "ok", "name": "智链产教", "model_version": "matching-1", "agent_configured": bool(config["key"]), "agent_model": config["model"]}
 
     @app.get("/api/profile")
     def profile(current=Depends(user)):
@@ -681,6 +688,12 @@ def create_app(data_root=None):
 
     from backend.competition_api import attach_competition
     attach_competition(app, store, user, role, owned, entity, flat)
+    from backend.evidence import attach_evidence
+    attach_evidence(app, store, user)
+    from backend.student_space import attach_student_space
+    attach_student_space(app, store, user)
+    from backend.market import attach_market
+    attach_market(app, store, user)
     from backend.experience_api import attach_experience
     attach_experience(app, store, user, role, owned, entity, flat, application_access, agent_run, updated_weights)
 

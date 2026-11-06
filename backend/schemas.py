@@ -12,6 +12,16 @@ class Account(Model):
     password: str = Field(min_length=10, max_length=128)
     name: str = Field(min_length=1, max_length=80)
     role: Literal["employer", "student", "university"]
+    company_tracks: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode='after')
+    def company_fields(self):
+        if self.company_tracks and self.role != 'employer':
+            raise ValueError('只有企业账号可以登记公司赛道')
+        self.company_tracks = list(dict.fromkeys(t.strip() for t in self.company_tracks))
+        if any(not t or len(t) > 100 for t in self.company_tracks):
+            raise ValueError('每项赛道需为1至100个字符')
+        return self
 
 
 class Login(Model):
@@ -43,7 +53,7 @@ class Hard(Model):
 
 class Job(Model):
     title: str = Field(min_length=1, max_length=120)
-    industry: Literal["AI产品", "金融科技"]
+    industry: str = Field(min_length=1, max_length=100)
     city: str = Field(min_length=1, max_length=40)
     work_mode: Literal["现场", "混合", "远程"] = "现场"
     salary_min: float = Field(ge=0, le=1000000)
