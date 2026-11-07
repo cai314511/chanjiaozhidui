@@ -13,6 +13,8 @@
 
 /* 角色占用独立空间，搜索和统计均保持可操作。 */
 .discovery-search.has-role-mascot{position:relative;padding-right:264px;min-height:300px;isolation:isolate}
+.discovery-hero.has-role-mascot{position:relative;max-width:none;padding-right:330px;min-height:380px;isolation:isolate}
+.discovery-hero.has-role-mascot .role-mascot-stage{width:300px;height:302px;right:10px}
 .intel-hero.has-role-mascot{position:relative;min-height:230px;padding-right:235px;isolation:isolate}
 .intel-hero.has-role-mascot .intel-signal{position:absolute;right:232px;bottom:18px;font-size:10px}
 .role-mascot-stage{position:absolute;width:224px;height:226px;right:15px;top:50%;transform:translateY(-50%);overflow:hidden;pointer-events:none;isolation:isolate;contain:layout paint}
@@ -28,3 +30,5 @@
 @media(max-width:1200px){.discovery-search.has-role-mascot{padding-right:216px}.role-mascot-stage{width:190px;height:192px;right:8px}.intel-hero.has-role-mascot{padding-right:206px;min-height:230px}.intel-hero.has-role-mascot .intel-signal{position:static;align-self:flex-start}.discovery-search.has-role-mascot .discovery-input{flex-wrap:wrap}.discovery-search.has-role-mascot .discovery-input input{flex-basis:100%}}
 @media(max-width:760px){.discovery-search.has-role-mascot{padding-right:19px;padding-top:148px;min-height:0}.discovery-search.has-role-mascot>.eyebrow{display:block;max-width:calc(100% - 135px);position:absolute;top:34px;left:19px;line-height:1.9}.discovery-search.has-role-mascot::after{content:'你的专属 Agent';position:absolute;top:74px;left:19px;color:#657f77;font-size:12px}.role-mascot-stage{width:140px;height:142px;top:4px;right:10px;transform:none}.intel-hero.has-role-mascot{padding:12px 0 148px;min-height:0}.intel-hero.has-role-mascot .role-mascot-stage{top:auto;bottom:3px;right:5px}.intel-hero.has-role-mascot .intel-signal{max-width:calc(100% - 140px);white-space:normal;line-height:1.8}.mascot-rail{top:16px;bottom:20px;width:3px}.mascot-shadow{bottom:5px}#agent-toggle.mascot-entry{width:76px;height:92px;right:12px;bottom:12px}.mascot-entry-art{bottom:16px}.mascot-entry-label{left:12px;right:12px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.role-mascot-stage *,.mascot-entry-art{animation:none!important;transition:none!important}.mascot-arrival{transform:none}}
+@media(max-width:1200px){.discovery-hero.has-role-mascot{padding-right:250px}.discovery-hero.has-role-mascot .role-mascot-stage{width:224px;height:226px}}
+@media(max-width:760px){.discovery-hero.has-role-mascot{padding:184px 0 28px;min-height:0}.discovery-hero.has-role-mascot .role-mascot-stage{width:165px;height:167px;top:6px;right:0;transform:none}.discovery-hero.has-role-mascot>.eyebrow{position:absolute;left:0;top:45px;max-width:calc(100% - 180px);line-height:2}}

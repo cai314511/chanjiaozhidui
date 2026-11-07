@@ -1,0 +1,3 @@
+/* 透明标志按完整比例显示，名称和副标题由品牌区文字提供。 */
+.brand-mark{display:block;width:60px;aspect-ratio:1;flex-shrink:0}
+.brand-mark img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}

@@ -70,8 +70,8 @@ def test_role_mascot_home_cycle_entry_and_cleanup(browser_system, role):
     # 同一页签切换身份，旧角色及旧的异步图片回调不得带入新身份。
     page.locator('[data-action=mobile-menu]').click()
     page.locator('[data-action=logout]').click()
-    expect(entry).not_to_have_attribute('data-mascot-role', role)
-    expect(entry).to_have_text('✦')
+    expect(entry).to_have_attribute('data-mascot-audience', 'guest')
+    expect(entry).to_have_attribute('data-mascot-ready', 'true')
     assert not errors, errors
     page.close()
 
@@ -96,3 +96,81 @@ def test_mascot_reduced_motion_and_failed_asset_remain_usable(browser_system):
     expect(failed.locator('#agent-drawer')).to_be_visible()
     expect(failed.locator('.role-mascot-stage')).to_have_count(0)
     failed.close()
+
+
+def test_guest_mascots_random_pool_blends_and_login_identity(browser_system):
+    browser, base = browser_system
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+    instant = datetime(2026, 11, 7, 10, tzinfo=timezone.utc)
+    page.clock.install(time=instant)
+    page.clock.pause_at(instant)
+    # 仅固定随机采样，角色素材、轮播与业务接口仍使用真实实现。
+    page.add_init_script('''let sample=0;const values=[0,.48,.96,.24,.72,.12,.84];
+        Math.random=()=>values[sample++%values.length];''')
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.goto(base)
+    entry = page.locator('#agent-toggle')
+    stage = page.locator('.discovery-hero .role-mascot-stage')
+    expect(entry).to_have_attribute('data-mascot-audience', 'guest')
+    expect(stage).to_have_count(1)
+    expect(stage).to_have_attribute('data-mascot-audience', 'guest')
+    expect(entry).to_have_attribute('data-mascot-ready', 'true')
+    seen = set()
+    previous = None
+    for index in range(10):
+        pair = (stage.get_attribute('data-mascot-role'), stage.get_attribute('data-pose'))
+        assert pair[0] in {'student', 'employer', 'university'}
+        assert 1 <= int(pair[1]) <= 9
+        assert pair != previous
+        seen.add(pair[0])
+        previous = pair
+        assert entry.locator('.mascot-cell-0').count() == 2
+        page.clock.run_for(3000)
+    assert len(seen) == 3
+    page.clock.run_for(200)
+    for target in [entry, stage]:
+        opacity = target.locator('.mascot-pose').evaluate_all('(els)=>els.map(el=>Number(el.style.opacity))')
+        assert all(0 < value < 1 for value in opacity), opacity
+        assert sum(opacity) == pytest.approx(1)
+    page.clock.resume()
+    folder = Path(__file__).resolve().parents[1] / 'runtime/role-mascot-review'
+    folder.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(folder / 'guest-desktop.png'), animations='disabled')
+    for width in [1024, 768, 390]:
+        page.set_viewport_size({'width': width, 'height': 844})
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        hero_text = page.locator('.discovery-hero h1').bounding_box()
+        mascot = stage.bounding_box()
+        assert mascot['x'] >= hero_text['x'] + hero_text['width'] or mascot['y'] + mascot['height'] <= hero_text['y']
+    page.screenshot(path=str(folder / 'guest-mobile.png'), animations='disabled')
+    entry.click()
+    expect(page.locator('#toast')).to_contain_text('登录')
+    assert page.locator('#agent-drawer').is_hidden()
+    # 注册完成后应使用本端形象，访客轮播不得继续覆盖身份。
+    page.set_viewport_size({'width': 1440, 'height': 1000})
+    register(page, base, 'employer', 'guest-to-employer')
+    expect(entry).to_have_attribute('data-mascot-audience', 'employer')
+    expect(entry).to_have_attribute('data-mascot-role', 'employer')
+    page.clock.run_for(9000)
+    expect(entry).to_have_attribute('data-mascot-role', 'employer')
+    expect(page.locator('.role-mascot-stage')).to_have_attribute('data-mascot-role', 'employer')
+    assert not errors, errors
+    page.close()
+
+
+def test_guest_reduced_motion_and_partial_missing_atlas(browser_system):
+    browser, base = browser_system
+    page = browser.new_page(reduced_motion='reduce')
+    page.clock.install()
+    page.route('**/assets/mascots/student.png', lambda route: route.abort())
+    page.goto(base)
+    stage = page.locator('.role-mascot-stage')
+    expect(stage).to_have_attribute('data-motion', 'reduced')
+    before = stage.get_attribute('data-mascot-role')
+    assert before in {'employer', 'university'}
+    page.clock.run_for(12000)
+    expect(stage).to_have_attribute('data-mascot-role', before)
+    assert stage.evaluate('(el)=>el.getAnimations({subtree:true}).length') == 0
+    expect(page.locator('#agent-toggle')).to_have_attribute('data-mascot-ready', 'true')
+    page.close()
