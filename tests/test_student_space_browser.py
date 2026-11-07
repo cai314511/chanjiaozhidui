@@ -4,11 +4,13 @@ import socket
 import threading
 import time
 import uuid
+from fractions import Fraction
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urljoin
 
 import pytest
+import av
 import uvicorn
 from PIL import Image
 from playwright.sync_api import expect, sync_playwright
@@ -47,27 +49,26 @@ def image_bytes():
     return output.getvalue()
 
 
-def record_video(page):
-    # 由真实浏览器编码一段可播放的测试视频，不使用伪装后缀的字节。
-    return bytes(page.evaluate('''async () => {
-        const canvas=document.createElement('canvas');canvas.width=160;canvas.height=100;
-        canvas.style.position='fixed';canvas.style.left='0';canvas.style.top='0';
-        document.body.append(canvas);
-        const ctx=canvas.getContext('2d');ctx.fillRect(0,0,160,100);
-        const stream=canvas.captureStream(0),track=stream.getVideoTracks()[0];
-        const recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'}),chunks=[];
-        recorder.ondataavailable=event=>{if(event.data.size)chunks.push(event.data)};
-        const finished=new Promise(resolve=>recorder.onstop=resolve);
-        recorder.start();
-        for(let index=0;index<12;index++){
-            ctx.fillStyle=index%2?'#2c806b':'#c2a553';ctx.fillRect(0,0,160,100);
-            ctx.fillStyle='#ffffff';ctx.fillRect(index*10,30,20,40);track.requestFrame();
-            await new Promise(resolve=>setTimeout(resolve,80));
-        }
-        recorder.stop();await finished;stream.getTracks().forEach(track=>track.stop());
-        canvas.remove();
-        return Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()));
-    }'''))
+def record_video():
+    # 软件编码固定测试素材，避免GPU合成时序产生只有容器头的输入。
+    # 后续上传、权限及三端实际浏览器播放仍走正式实现。
+    output = BytesIO()
+    with av.open(output, mode='w', format='webm') as container:
+        stream = container.add_stream('libvpx', rate=12)
+        stream.width, stream.height, stream.pix_fmt = 160, 100, 'yuv420p'
+        for index in range(12):
+            image = Image.new('RGB', (160, 100), '#2c806b' if index % 2 else '#c2a553')
+            image.paste('#ffffff', (index * 10, 30, index * 10 + 20, 70))
+            frame = av.VideoFrame.from_image(image)
+            frame.pts, frame.time_base = index, Fraction(1, 12)
+            for packet in stream.encode(frame):
+                container.mux(packet)
+        for packet in stream.encode():
+            container.mux(packet)
+    content = output.getvalue()
+    with av.open(BytesIO(content)) as decoded:
+        assert sum(1 for _ in decoded.decode(video=0)) == 12
+    return content
 
 
 def expect_video_ready(page):
@@ -127,7 +128,7 @@ def test_student_home_upload_publish_three_roles_following_and_withdraw(student_
         'name': '公开简历.txt', 'mimeType': 'text/plain', 'buffer': '公开简历正文：校园产品调研'.encode(),
     })
     expect(form.locator('#space-documents')).to_contain_text('公开简历.txt')
-    video = record_video(student)
+    video = record_video()
     assert len(video) > 100
     student.locator('#space-portfolio-upload').set_input_files({
         'name': '项目演示.webm', 'mimeType': 'video/webm', 'buffer': video,

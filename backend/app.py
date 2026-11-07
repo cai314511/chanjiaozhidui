@@ -694,6 +694,12 @@ def create_app(data_root=None):
     attach_student_space(app, store, user)
     from backend.market import attach_market
     attach_market(app, store, user)
+    from backend.company_logos import attach_company_logos
+    attach_company_logos(app)
+    from backend.university_courses import attach_university_courses
+    attach_university_courses(app, store, user)
+    from backend.university_intelligence import attach_university_intelligence
+    attach_university_intelligence(app, store, user)
     from backend.experience_api import attach_experience
     attach_experience(app, store, user, role, owned, entity, flat, application_access, agent_run, updated_weights)
 

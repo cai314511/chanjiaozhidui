@@ -9,3 +9,5 @@ _run_*.py
 *.baiduyun.p.downloading
 比赛数据/
 .DS_Store
+Assets/company-logos/.registry-write.lock
+Assets/company-logos/.registry-*.part

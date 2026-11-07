@@ -9,6 +9,7 @@ let dictation=null,callStream=null;
 let liveTranscriber=null,playbackContext=null,playbackFrame;
 let playbackGeneration=0,finishPlayback=null;
 let waterOrb=null;
+let captureEpoch=0;
 function cancelPlayback(){playbackGeneration++;playback?.pause();finishPlayback?.();finishPlayback=null;cancelAnimationFrame(playbackFrame);playbackContext?.close();playbackContext=null;waterOrb?.setVolume(0)}
 const modal=()=>document.querySelector('#modal');
 function valid(session){return active===session&&state.sessionEpoch===session.epoch&&modal().open;}
@@ -27,7 +28,7 @@ export function stopVoice(){
 modal().addEventListener('close',stopVoice);
 window.addEventListener('navigate',stopVoice);
 window.addEventListener('identity-reset',stopVoice);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){if(recording)pauseRecording();stopDictation();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){captureEpoch++;if(recording)pauseRecording();stopDictation();}});
 window.addEventListener('dictation-stop',stopDictation);
 async function localSpeak(text,session){
  if(!valid(session))return;
@@ -74,9 +75,9 @@ async function openSession(data){
  else if(!session.interacted&&!recording&&!session.gettingStream&&!session.finishing&&!session.sending&&document.querySelector('.droplet-stage').dataset.mode!=='error')localSpeak(data.messages.filter(m=>m.role==='assistant').at(-1).text,session).catch(showError);
 }
 function showError(err){if(err.name==='AbortError')return;const target=document.querySelector('#voice-error');if(target)target.textContent=err.message;setStatus('error',err.name==='NotAllowedError'?'麦克风权限未开启，请允许访问后重试':'本轮操作未完成，可以重试');}
-async function obtainStream(session){if(stream)return stream;const acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});if(!valid(session)){acquired.getTracks().forEach(track=>track.stop());throw new DOMException('访谈已关闭','AbortError');}stream=acquired;return acquired;}
+async function obtainStream(session){if(stream)return stream;const epoch=captureEpoch,acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});if(!valid(session)||document.hidden||epoch!==captureEpoch){acquired.getTracks().forEach(track=>track.stop());throw new DOMException('访谈已关闭或暂停','AbortError');}stream=acquired;return acquired;}
 async function startRecording(session){
- if(!valid(session)||recording||session.gettingStream||session.finishing)return;
+ if(!valid(session)||document.hidden||recording||session.gettingStream||session.finishing)return;
  session.gettingStream=true;cancelPlayback();try{await obtainStream(session);}finally{session.gettingStream=false;}if(!valid(session))return;
  recording=true;lastVoice=performance.now();document.querySelector('#voice-mic')?.classList.add('recording');setStatus('listening','正在聆听 · 转写会分段显示');
  liveTranscriber=new ContinuousTranscriber({
@@ -166,17 +167,22 @@ async function connectHuman(session){
  };await poll();
 }
 
-function stopDictation(){if(!dictation)return;const value=dictation;dictation=null;value.cancelled=true;clearTimeout(value.timer);value.live?.cancel();value.stream?.getTracks().forEach(track=>track.stop());value.preview?.remove();restoreDictation(value);}
-function restoreDictation(value){if(value.trigger.isConnected){value.trigger.disabled=false;value.trigger.textContent='◉ 语音输入';value.trigger.classList.remove('recording');value.trigger.onclick=event=>{event.stopPropagation();dictateInto(value.textarea,value.trigger).catch(err=>toast(err.message));};}}
-export async function dictateInto(textarea,trigger){
+function stopDictation(){if(!dictation)return;const value=dictation;dictation=null;value.cancelled=true;clearTimeout(value.timer);value.live?.cancel();value.stream?.getTracks().forEach(track=>track.stop());value.preview?.remove();restoreDictation(value);value.hooks.onMode?.('idle');}
+function restoreDictation(value){if(value.trigger.isConnected){value.trigger.disabled=false;value.trigger.textContent='◉ 语音输入';value.trigger.classList.remove('recording');value.trigger.onclick=event=>{event.stopPropagation();dictateInto(value.textarea,value.trigger,value.hooks).catch(err=>{value.hooks.onError?.(err);toast(err.message)});};}}
+export async function dictateInto(textarea,trigger,hooks={}){
  if(recording||peer||dictation){toast('请先停止当前录音');return;}
- const value={epoch:state.sessionEpoch,textarea,trigger,cancelled:false};dictation=value;
- try{value.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}catch(err){if(dictation===value)dictation=null;throw err;}
+ const value={epoch:state.sessionEpoch,textarea,trigger,hooks,cancelled:false};dictation=value;
+ trigger.disabled=true;
+ try{value.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}catch(err){if(dictation===value){dictation=null;restoreDictation(value)}throw err;}
  if(dictation!==value||value.epoch!==state.sessionEpoch||!textarea.isConnected){value.stream.getTracks().forEach(track=>track.stop());return;}
  const usable=()=>!value.cancelled&&value.epoch===state.sessionEpoch&&textarea.isConnected;
  value.preview=document.createElement('p');value.preview.className='transcript-interim';value.preview.setAttribute('aria-live','polite');textarea.after(value.preview);
- value.live=new ContinuousTranscriber({onInterim:text=>{if(usable())value.preview.textContent=text?'正在识别：'+text:''},onFinal:text=>{if(usable()){textarea.value+=(textarea.value?'\n':'')+text;textarea.dispatchEvent(new Event('input',{bubbles:true}))}},onError:err=>{toast(err.message);stopDictation()}});
- const stop=async()=>{clearTimeout(value.timer);trigger.disabled=true;trigger.textContent='正在确认转写…';try{await value.live.stop()}catch(err){toast(err.message)}finally{if(dictation===value)dictation=null;value.preview.remove();restoreDictation(value)}};
- trigger.textContent='停止录音';trigger.classList.add('recording');trigger.onclick=event=>{event.stopPropagation();stop()};
- await value.live.start(value.stream);value.timer=setTimeout(stop,60000);
+ value.live=new ContinuousTranscriber({onInterim:text=>{if(usable())value.preview.textContent=text?'正在识别：'+text:''},onFinal:text=>{if(usable()){textarea.value+=(textarea.value?'\n':'')+text;textarea.dispatchEvent(new Event('input',{bubbles:true}))}},onVolume:level=>{if(usable())hooks.onVolume?.(level)},onError:err=>{stopDictation();hooks.onError?.(err);toast(err.message)}});
+ const stop=async()=>{
+  if(value.stopping||value.cancelled)return;value.stopping=true;clearTimeout(value.timer);trigger.disabled=true;trigger.textContent='正在确认转写…';hooks.onMode?.('transcribing');
+  let failure;
+  try{await value.live.stop()}catch(err){failure=err;toast(err.message)}finally{if(dictation===value)dictation=null;value.preview.remove();restoreDictation(value);if(!value.cancelled){if(failure)hooks.onError?.(failure);else hooks.onMode?.('idle')}}
+ };
+ trigger.textContent='停止录音';trigger.classList.add('recording');trigger.disabled=false;trigger.onclick=event=>{event.stopPropagation();stop()};
+ try{await value.live.start(value.stream);if(!usable()||value.stopping||dictation!==value){value.live.cancel();return}hooks.onMode?.('listening');value.timer=setTimeout(stop,60000)}catch(err){if(dictation===value)stopDictation();throw err}
 }

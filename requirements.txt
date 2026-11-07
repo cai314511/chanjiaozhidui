@@ -13,6 +13,7 @@ scipy>=1.14,<2
 pytest>=8,<10
 psutil>=6,<8
 faster-whisper>=1.2,<2
+av>=16,<19
 beautifulsoup4>=4.12,<5
 urllib3>=2.2,<3
 opencc-python-reimplemented>=0.1.7,<1

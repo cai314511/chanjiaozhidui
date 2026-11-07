@@ -1,0 +1,200 @@
+[
+  {
+    "brand": "ABB",
+    "asset_name": "abb",
+    "company_names": ["ABB", "ABB（中国）有限公司", "ABB杭州盈控自动化有限公司", "ABB（中国）有限公司厦门分公司"],
+    "allowed_asset_hosts": ["accessmanagement.motion.abb.com.cn"],
+    "extract_svg_png": true,
+    "source": {
+      "page_url": "https://accessmanagement.motion.abb.com.cn/",
+      "asset_url": "https://accessmanagement.motion.abb.com.cn/static/media/ABB_Logo_Screen.c0af8f97.svg",
+      "relationship_url": "https://new.abb.com/cn/about/businesses/automation/hangzhou-winmation-automation",
+      "relationship_urls": [
+        "https://new.abb.com/cn",
+        "https://new.abb.com/low-voltage/zh/service/abb-connect/abb-connect-privacy",
+        "https://new.abb.com/cn/about/businesses/automation/hangzhou-winmation-automation",
+        "https://global.abb/content/dam/abb/global/group/about/supplying/2023/doc/Supplying-ABB-Registered-Address.pdf"
+      ],
+      "relationship_note": "品牌SVG来自ABB中国域名下公开CIAM门户页面所引用的main.fe7b65ea.chunk.js，无需登录。ABB官网隐私声明确认ABB（中国）有限公司；杭州盈控官网页面明确其为ABB全资企业；ABB官方注册地址清单列出ABB China Ltd. Xiamen Branch。仅这四个逐项核对的目录名称共用，不按ABB字符串批量扩展。"
+    }
+  },
+  {
+    "brand": "7-Eleven",
+    "asset_name": "7-eleven",
+    "company_names": ["7-ELEVEn"],
+    "allowed_asset_hosts": ["www.7-11.cn"],
+    "source": {
+      "page_url": "https://www.7-11.cn/",
+      "asset_url": "https://www.7-11.cn/logo.jpg",
+      "relationship_url": "https://www.7-11.cn/",
+      "relationship_note": "7-Eleven华南官方网站展示品牌标识；目录该条仅为7-ELEVEn品牌名，未向未经核对的加盟或运营法人扩展。"
+    }
+  },
+  {
+    "brand": "A.O. Smith",
+    "asset_name": "ao-smith",
+    "company_names": ["A.O.史密斯（中国）"],
+    "allowed_asset_hosts": ["www.aosmith-ailink.com"],
+    "embedded_selector": "img[alt=logo]",
+    "embedded_index": 1,
+    "source": {
+      "page_url": "https://www.aosmith-ailink.com/",
+      "asset_url": "https://www.aosmith-ailink.com/",
+      "relationship_url": "https://www.aosmith.com.cn/",
+      "relationship_note": "aosmith.com.cn官网跳转至现官网，页脚标明中国运营实体；提取页头第二个img[alt=logo]内嵌深色PNG。目录为中国品牌名，不扩展其他公司。"
+    }
+  },
+  {
+    "brand": "Aden Group",
+    "asset_name": "aden-group",
+    "company_names": ["Aden Group"],
+    "allowed_asset_hosts": ["adengroup.com"],
+    "source": {
+      "page_url": "https://adengroup.com/",
+      "asset_url": "https://adengroup.com/wp-content/themes/aden-group/assets/Logo.png",
+      "relationship_url": "https://adengroup.com/about-us/",
+      "relationship_note": "官网About Us列明Aden Group及其设施管理、能源和Akila业务，与目录品牌名精确对应；未混用aden-group.com等相似域名。"
+    }
+  },
+  {
+    "brand": "DEKRA",
+    "asset_name": "dekra",
+    "company_names": ["DEKRA德凯"],
+    "allowed_asset_hosts": ["www.dekra.com.cn"],
+    "source": {
+      "page_url": "https://www.dekra.com.cn/zh/home/",
+      "asset_url": "https://www.dekra.com.cn/zh/home/",
+      "relationship_url": "https://www.dekra.com.cn/zh/home/",
+      "relationship_note": "DEKRA德凯中国官方网站页头完整Logo；提取img[alt=Logo]中的静态SVG并安全转PNG。目录为品牌名，不将同字企业自动视为子公司。"
+    },
+    "embedded_selector": "img[alt=Logo]",
+    "rasterize_svg": true
+  },
+  {
+    "brand": "Huawei",
+    "asset_name": "huawei",
+    "company_names": ["华为技术有限公司"],
+    "allowed_asset_hosts": ["www.huawei.com"],
+    "source": {
+      "page_url": "https://www.huawei.com/cn/",
+      "asset_url": "https://www.huawei.com/-/media/hcomponent-header/1.0.1.20260908162100/component/img/huawei_logo.png",
+      "relationship_url": "https://www.huawei.com/cn/legal/",
+      "relationship_note": "华为官网页头标识，官网版权及法律声明明确华为技术有限公司。未用于包含华为字样的其他独立企业。"
+    }
+  },
+  {
+    "brand": "BYD",
+    "asset_name": "byd",
+    "company_names": ["比亚迪股份有限公司"],
+    "allowed_asset_hosts": ["www.bydglobal.com"],
+    "source": {
+      "page_url": "https://www.bydglobal.com/cn/",
+      "asset_url": "https://www.bydglobal.com/material/group-official-website/common/logo.png",
+      "relationship_url": "https://www.bydglobal.com/cn/about",
+      "relationship_note": "比亚迪集团官网页头标识，页脚版权明确比亚迪股份有限公司；仅对应母公司精确名称，不将电子或汽车子公司混用。"
+    }
+  },
+  {
+    "brand": "CATL",
+    "asset_name": "catl",
+    "company_names": ["宁德时代新能源科技股份有限公司"],
+    "allowed_asset_hosts": ["www.catl.com"],
+    "rasterize_svg": true,
+    "source": {
+      "page_url": "https://www.catl.com/",
+      "asset_url": "https://www.catl.com/template/1/default/_files/svg/logo.svg",
+      "relationship_url": "https://www.catl.com/",
+      "relationship_note": "宁德时代CATL官网页头标识，版权主体Contemporary Amperex Technology Co., Limited；仅对应目录中的母公司全名。"
+    }
+  },
+  {
+    "brand": "ZTE",
+    "asset_name": "zte",
+    "company_names": ["中兴通讯", "中兴通讯股份有限公司"],
+    "allowed_asset_hosts": ["www.zte.com.cn"],
+    "source": {
+      "page_url": "https://www.zte.com.cn/china/",
+      "asset_url": "https://www.zte.com.cn/content/dam/zte-site/res-www-zte-com-cn/navigator/china/main/img/logo-blue.png",
+      "relationship_url": "https://www.zte.com.cn/china/",
+      "relationship_note": "中兴通讯官网页头蓝色标识，页脚版权明确中兴通讯股份有限公司，品牌简称与公司全名可共用；不扩展其他中兴实体。"
+    }
+  },
+  {
+    "brand": "Midea Group",
+    "asset_name": "midea-group",
+    "company_names": ["美的集团"],
+    "allowed_asset_hosts": ["cn-res.midea.com"],
+    "source": {
+      "page_url": "https://www.midea.com.cn/en",
+      "asset_url": "https://cn-res.midea.com/content/dam/mideacn-aem/test/logo-1x.png",
+      "relationship_url": "https://www.midea.com.cn/zh/about-midea",
+      "relationship_note": "美的集团官网直接引用midea.com官方资源主机，页脚Midea Group及关于美的页面明确集团品牌；未用于美的参股或不同品牌子公司。"
+    }
+  },
+  {
+    "brand": "LONGi",
+    "asset_name": "longi",
+    "company_names": ["隆基绿能科技股份有限公司"],
+    "allowed_asset_hosts": ["www.longi.com"],
+    "embedded_selector": "img[alt=Logo]",
+    "embedded_index": 0,
+    "rasterize_svg": true,
+    "source": {
+      "page_url": "https://www.longi.com/cn/",
+      "asset_url": "https://www.longi.com/cn/",
+      "relationship_url": "https://www.longi.com/cn/",
+      "relationship_note": "隆基绿能官网版权主体为隆基绿能科技股份有限公司；提取官网页头内嵌静态SVG标识后安全转PNG，未用于名称近似的其他隆基企业。"
+    }
+  },
+  {
+    "brand": "iFLYTEK",
+    "asset_name": "iflytek",
+    "company_names": ["科大讯飞股份有限公司"],
+    "allowed_asset_hosts": ["www.iflytek.com"],
+    "rasterize_svg": true,
+    "source": {
+      "page_url": "https://www.iflytek.com/en/",
+      "asset_url": "https://www.iflytek.com/en/Public/Uploads/uploadfile/images/20230812/comlogo1.svg",
+      "relationship_url": "https://www.xfyun.cn/introduction",
+      "relationship_note": "科大讯飞官网英文页头标识；官方讯飞开放平台公司介绍明确科大讯飞股份有限公司。不扩展讯飞教育等独立子公司。"
+    }
+  },
+  {
+    "brand": "Ping An Bank",
+    "asset_name": "ping-an-bank",
+    "company_names": ["平安银行股份有限公司"],
+    "allowed_asset_hosts": ["resources.pingan.com"],
+    "rasterize_svg": true,
+    "source": {
+      "page_url": "https://bank.pingan.com/",
+      "asset_url": "https://resources.pingan.com/app_inc/bank/v2023/images/PClogo_bank.svg",
+      "relationship_url": "https://www.pingan.com/creditcard/announcement/97260.jsp",
+      "relationship_note": "平安银行官网直接引用平安官方资源主机上的银行标识，官方更名公告确认平安银行股份有限公司与品牌名称关系；未复用到分行。"
+    }
+  },
+  {
+    "brand": "China Merchants Bank",
+    "asset_name": "cmb",
+    "company_names": ["招商银行股份有限公司信用卡中心"],
+    "allowed_asset_hosts": ["wwwcdn.cmbimg.cn"],
+    "source": {
+      "page_url": "https://www.cmbchina.com/",
+      "asset_url": "https://wwwcdn.cmbimg.cn/Images/logo.png",
+      "relationship_url": "https://site.cc.cmbimg.com/AgreementManager/agreement/18a1704d5bfc44c6bb3b68133ece3f85.html",
+      "relationship_note": "招商银行官网直接引用该官方图片主机；信用卡官方隐私政策明确招商银行股份有限公司信用卡中心及招行信用卡业务。未扩展到未逐项核对的分行。"
+    }
+  },
+  {
+    "brand": "TCL",
+    "asset_name": "tcl",
+    "company_names": ["TCL实业控股股份有限公司"],
+    "allowed_asset_hosts": ["aws-obg-image-lb-4.tcl.com"],
+    "rasterize_svg": true,
+    "source": {
+      "page_url": "https://www.tcl.com/cn/zh",
+      "asset_url": "https://aws-obg-image-lb-4.tcl.com/content/dam/brandsite/it-resources/common/navigation/tcl-logo.svg",
+      "relationship_url": "https://www.tcl.com/cn/zh",
+      "relationship_note": "TCL官网页头标识，页脚版权主体明确TCL实业控股股份有限公司；未把TCL科技集团或华星等不同实体直接合并。"
+    }
+  }
+]

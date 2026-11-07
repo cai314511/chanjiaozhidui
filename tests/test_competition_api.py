@@ -62,6 +62,19 @@ def test_case_without_source_is_never_silently_filled(system):
     assert uni.post('/api/competition/cases', json=case).status_code == 404
 
 
+def test_verified_opaque_dataset_id_is_not_mistaken_for_contact_data(system):
+    uni = account(system, 'university', 'opaque-source-school')
+    case = prepare(uni)
+    item = system.state.store.get(case['recruitment_id'])
+    opaque_id = 'ab13800138000cd'
+    system.state.store.save('research_dataset', item['owner'], item['data'], opaque_id)
+    case['recruitment_id'] = opaque_id
+    response = uni.post('/api/competition/cases', json=case)
+    assert response.status_code == 200, response.text
+    case['assumptions'] = '请联系13800138000确认'
+    assert uni.post('/api/competition/cases', json=case).status_code == 422
+
+
 def test_public_suppression_removes_complementary_counts():
     from backend.competition_api import public_result
     result = public_result({'split': {'direction_counts': {'d': 98}, 'allocated': 98,

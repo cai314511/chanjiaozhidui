@@ -5,6 +5,7 @@ export class ContinuousTranscriber {
  }
  async start(stream) {
   this.stream=stream;this.running=true;this.context=new AudioContext();await this.context.resume();
+  if(this.cancelled||!this.running){this.release();return;}
   this.analyser=this.context.createAnalyser();this.analyser.fftSize=1024;
   this.context.createMediaStreamSource(stream).connect(this.analyser);
   this.values=new Uint8Array(1024);this.begin();this.meter();
@@ -54,6 +55,8 @@ export class ContinuousTranscriber {
  }
  async stop() {
   this.running=false;cancelAnimationFrame(this.frame);clearInterval(this.timer);
+  // 麦克风已取得但AudioContext仍在初始化时，也必须立即结束捕获。
+  if(!this.recorder){this.cancelled=true;this.release();return;}
   const needsFinal=this.rotating;
   const stopped=this.recorder.state==='recording'?new Promise(resolve=>{this.recorder.addEventListener('stop',resolve,{once:true});this.recorder.stop()}):Promise.resolve();
   this.stream?.getTracks().forEach(t=>t.stop());

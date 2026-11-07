@@ -1,0 +1,30 @@
+.mascot-student{--mascot-sheet:url('/assets/mascots/student.png');--mascot-glow:#48d3e0;--mascot-ink:#217e9e}
+.mascot-employer{--mascot-sheet:url('/assets/mascots/employer.png');--mascot-glow:#58b4ee;--mascot-ink:#2d689a}
+.mascot-university{--mascot-sheet:url('/assets/mascots/university.png');--mascot-glow:#a984eb;--mascot-ink:#79589b}
+.mascot-pose{position:absolute;inset:0;background-image:var(--mascot-sheet);background-repeat:no-repeat;background-size:500% 200%;pointer-events:none;will-change:opacity}
+.mascot-cell-0{background-position:0 0}.mascot-cell-1{background-position:25% 0}.mascot-cell-2{background-position:50% 0}.mascot-cell-3{background-position:75% 0}.mascot-cell-4{background-position:100% 0}.mascot-cell-5{background-position:0 100%}.mascot-cell-6{background-position:25% 100%}.mascot-cell-7{background-position:50% 100%}.mascot-cell-8{background-position:75% 100%}.mascot-cell-9{background-position:100% 100%}
+
+/* 入口保留原按钮与点击逻辑，角色图层不拦截操作。 */
+#agent-toggle.mascot-entry{width:92px;height:108px;right:20px;bottom:18px;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;padding:0;isolation:isolate}
+.mascot-entry-art{position:absolute;inset:0 0 16px;filter:drop-shadow(0 6px 5px #244b4533);animation:mascot-breathe 3.8s ease-in-out infinite;transition:filter .2s}
+.mascot-entry-label{position:absolute;left:21px;right:21px;bottom:0;border:1px solid #c1ab6a9c;border-radius:20px;background:#f8fbedee;color:#355b51;font-size:10px;line-height:21px;letter-spacing:1px;box-shadow:0 3px 9px #294b4a12}
+#agent-toggle.mascot-entry:hover .mascot-entry-art{filter:drop-shadow(0 8px 7px #244b4555);animation-duration:1.8s}
+#agent-toggle.mascot-entry:focus-visible{outline:2px solid #398678;outline-offset:4px;border-radius:20px}
+
+/* 角色占用独立空间，搜索和统计均保持可操作。 */
+.discovery-search.has-role-mascot{position:relative;padding-right:264px;min-height:300px;isolation:isolate}
+.intel-hero.has-role-mascot{position:relative;min-height:230px;padding-right:235px;isolation:isolate}
+.intel-hero.has-role-mascot .intel-signal{position:absolute;right:232px;bottom:18px;font-size:10px}
+.role-mascot-stage{position:absolute;width:224px;height:226px;right:15px;top:50%;transform:translateY(-50%);overflow:hidden;pointer-events:none;isolation:isolate;contain:layout paint}
+.mascot-aura{position:absolute;inset:20px 4px 12px;border-radius:50%;background:radial-gradient(ellipse,color-mix(in srgb,var(--mascot-glow) 18%,transparent),transparent 68%)}
+.mascot-rail{position:absolute;right:0;top:24px;bottom:27px;width:5px;border-radius:9px;background:linear-gradient(transparent,color-mix(in srgb,var(--mascot-glow) 58%,white),#fbfbedb8,transparent);box-shadow:-3px 0 14px color-mix(in srgb,var(--mascot-glow) 22%,transparent);z-index:3}
+.mascot-arrival{position:absolute;inset:0;z-index:2;animation:mascot-arrive 3s cubic-bezier(.23,.7,.3,1) both;transform-origin:75% 75%}
+.mascot-body{position:absolute;inset:0;animation:mascot-idle 3s ease-in-out 3s infinite;transform-origin:50% 85%;filter:drop-shadow(0 6px 5px #345a4b16)}
+.mascot-shadow{position:absolute;bottom:9px;left:22%;width:59%;height:12px;border-radius:50%;background:radial-gradient(ellipse,#365f5026,transparent 70%);animation:mascot-shadow-in 3s ease both}
+@keyframes mascot-arrive{0%{transform:translate(90%,14px) rotate(-13deg)}16%{transform:translate(51%,4px) rotate(-9deg)}34%{transform:translate(51%,1px) rotate(-5deg)}43%{transform:translate(49%,4px) rotate(-9deg)}58%{transform:translate(34%,-3px) rotate(-3deg)}72%{transform:translate(19%,3px) rotate(2deg)}86%{transform:translate(7%,-2px) rotate(-1deg)}100%{transform:translate(0,0) rotate(0)}}
+@keyframes mascot-idle{0%,100%{transform:translateY(0) rotate(-.6deg)}50%{transform:translateY(-4px) rotate(.6deg)}}
+@keyframes mascot-breathe{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-4px) rotate(1deg)}}
+@keyframes mascot-shadow-in{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
+@media(max-width:1200px){.discovery-search.has-role-mascot{padding-right:216px}.role-mascot-stage{width:190px;height:192px;right:8px}.intel-hero.has-role-mascot{padding-right:206px;min-height:230px}.intel-hero.has-role-mascot .intel-signal{position:static;align-self:flex-start}.discovery-search.has-role-mascot .discovery-input{flex-wrap:wrap}.discovery-search.has-role-mascot .discovery-input input{flex-basis:100%}}
+@media(max-width:760px){.discovery-search.has-role-mascot{padding-right:19px;padding-top:148px;min-height:0}.discovery-search.has-role-mascot>.eyebrow{display:block;max-width:calc(100% - 135px);position:absolute;top:34px;left:19px;line-height:1.9}.discovery-search.has-role-mascot::after{content:'你的专属 Agent';position:absolute;top:74px;left:19px;color:#657f77;font-size:12px}.role-mascot-stage{width:140px;height:142px;top:4px;right:10px;transform:none}.intel-hero.has-role-mascot{padding:12px 0 148px;min-height:0}.intel-hero.has-role-mascot .role-mascot-stage{top:auto;bottom:3px;right:5px}.intel-hero.has-role-mascot .intel-signal{max-width:calc(100% - 140px);white-space:normal;line-height:1.8}.mascot-rail{top:16px;bottom:20px;width:3px}.mascot-shadow{bottom:5px}#agent-toggle.mascot-entry{width:76px;height:92px;right:12px;bottom:12px}.mascot-entry-art{bottom:16px}.mascot-entry-label{left:12px;right:12px;font-size:9px}}
+@media(prefers-reduced-motion:reduce){.role-mascot-stage *,.mascot-entry-art{animation:none!important;transition:none!important}.mascot-arrival{transform:none}}

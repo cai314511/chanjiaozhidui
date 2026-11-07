@@ -1,5 +1,6 @@
 import {state,e,fmt,api,post,put,on,navigate,dialog,closeDialog,heading,button,empty,toast,splitList} from './core.js';
 import {dictateInto} from './voice.js';
+import {companyBrand,bindCompanyBrands} from './company-brand.js';
 
 let search={q:'',track:'',page:1},searchVersion=0,guide=null;
 window.addEventListener('identity-reset',()=>{search={q:'',track:'',page:1};searchVersion++;guide=null;document.querySelector('#exploration-dialog')?.close();});
@@ -24,6 +25,8 @@ async function loadResults(){
  const pages=Math.max(1,Math.ceil(Math.max(data.total_companies,data.total_jobs)/data.page_size));
  host.innerHTML=`<section class="panel"><div class="section-head"><div><h3>相关企业</h3><p>${fmt(data.total_companies)} 家匹配企业</p></div>${query.track&&state.user.role==='student'?button('收藏 '+query.track,'favorite-track',query.track,'small'):''}</div><div class="discovery-companies">${data.companies.map(c=>`<article class="discovery-company"><div class="company-symbol">${e(c.name.slice(0,1))}</div><span class="tag">${c.registered?'平台已入驻':'本地资料收录'}</span><h4>${e(c.name)}</h4><div class="chips">${c.tracks.map(t=>`<button class="tag track-chip" data-action="explore-track" data-id="${e(t)}">${e(t)}</button>`).join('')}</div><p class="hint">${fmt(c.history_count)} 条历史公告 · ${fmt(c.live_count)} 个平台岗位</p><div class="inline">${button('查看企业','market-company',c.id,'small')}${state.user.role==='student'?button('收藏企业','favorite-company',c.id,'small'):''}</div></article>`).join('')||empty(data.total_companies?'本页没有其他企业':'还没有匹配的企业',data.total_companies?'相关岗位继续列在下方。':'试试其他关键词或清除赛道筛选。')}</div><div class="inline pagination">${data.page>1?button('上一页','market-page',data.page-1):''}<span class="hint">第 ${data.page} / ${pages} 页 · 企业与岗位同步翻页</span>${data.page<pages?button('下一页','market-page',data.page+1):''}</div></section>
  <section class="panel"><h3>相关岗位</h3><p class="hint">${fmt(data.total_jobs)} 条检索结果；下列历史条目供研究探索，正在招聘的平台岗位以发布标识为准。</p>${data.jobs.map(historicalCard).join('')||empty('暂未找到岗位','可先收藏感兴趣的企业或赛道，留意平台后续发布。')}</section>`;
+ host.querySelectorAll('.discovery-company .company-symbol').forEach((symbol,index)=>{symbol.outerHTML=companyBrand(data.companies[index])});
+ bindCompanyBrands(host);
 }
 
 export async function bindDiscovery(){
@@ -39,6 +42,8 @@ on('market-page',async el=>{search.page=Number(el.dataset.id);await loadResults(
 on('market-company',async el=>{
  const epoch=state.sessionEpoch,c=await api('/market/companies/'+encodeURIComponent(el.dataset.id));if(epoch!==state.sessionEpoch)return;
  dialog(c.name,`<span class="tag">${c.registered?'平台已入驻':'本地资料收录'}</span><div class="chips">${c.tracks.map(t=>`<span class="tag">${e(t)}</span>`).join('')}</div><p>${e(c.description||'从本地招聘资料整理的企业信息。')}</p>${state.user.role==='student'?button('收藏企业','favorite-company',c.id,'gold-btn'):''}<h3>平台发布的岗位</h3>${(c.jobs||[]).map(historicalCard).join('')||'<p class="hint">该企业暂未在平台发布岗位。</p>'}<h3>历史招聘资料</h3>${(c.historical_jobs||[]).map(j=>`<details><summary>${e(j.title)} · ${e(j.city)} · ${e(j.published||j.month||'')}</summary><p class="pre">${e(j.description||'')}</p><p class="hint">${e(JSON.stringify(j.provenance||j.source||''))}</p></details>`).join('')||'<p class="hint">暂无已收录历史公告。</p>'}`);
+ document.querySelector('#modal-content .dialog-head').insertAdjacentHTML('afterend',companyBrand(c));
+ bindCompanyBrands(document.querySelector('#modal-content'));
 });
 on('favorite-company',async el=>{await post('/me/favorites',{type:'company',target_id:el.dataset.id});toast('已加入我的企业收藏');});
 on('favorite-track',async el=>{await post('/me/favorites',{type:'track',target_id:el.dataset.id});toast('已加入我的赛道收藏');});

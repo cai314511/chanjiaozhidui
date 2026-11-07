@@ -99,7 +99,9 @@ def attach_competition(app, store, user, role, owned, entity, flat):
         for ident in payload.policy_ids:
             dataset(ident, current, 'policy')
         data = payload.model_dump()
-        if contains_identifiers(json.dumps(data, ensure_ascii=False)):
+        # 引用ID已逐项通过归属验证；随机摘要中偶然出现的数字不是联系方式。
+        content = {key: value for key, value in data.items() if key not in {'recruitment_id', 'employment_id', 'policy_ids'}}
+        if contains_identifiers(json.dumps(content, ensure_ascii=False)):
             raise HTTPException(422, '参赛培养方案含联系方式或个人标识，请脱敏后提交')
         return data
 

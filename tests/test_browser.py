@@ -146,7 +146,7 @@ def test_real_browser_three_surfaces_and_live_weights(browser_system):
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         page.set_viewport_size({"width": 390, "height": 844})
         page.reload()
-        expect(page.locator('#discovery-form')).to_be_visible()
+        expect(page.locator('#university-intelligence') if page is university else page.locator('#discovery-form')).to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
         page.locator('[data-action="mobile-menu"]').click()
         expect(page.locator('#sidebar')).to_have_class('sidebar open')

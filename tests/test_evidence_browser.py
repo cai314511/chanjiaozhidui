@@ -59,7 +59,10 @@ def test_shared_evidence_search_sources_and_mobile(evidence_browser, role):
     page.on('pageerror', lambda error: errors.append(str(error)))
     register(page, base, role, 'evidence-' + role)
     expect(page.locator('.brand h2')).to_have_text('智链产教')
-    expect(page.locator('.evidence-teaser')).to_contain_text('25 条相关历史公告')
+    if role == 'university':
+        expect(page.locator('#university-intelligence')).to_be_visible()
+    else:
+        expect(page.locator('.evidence-teaser')).to_contain_text('25 条相关历史公告')
     route(page, 'evidence')
     expect(page.locator('#evidence-jobs details')).to_have_count(20)
     page.locator('[data-action=evidence-page]').click()
