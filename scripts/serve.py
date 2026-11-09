@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 def main():
     parser = argparse.ArgumentParser(description="启动或停止智链产教本地服务")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--background", action="store_true")
     parser.add_argument("--stop", action="store_true")
     args = parser.parse_args()
@@ -51,7 +52,7 @@ def main():
         pythonw = Path(sys.executable).with_name("pythonw.exe")
         executable = str(pythonw if pythonw.exists() else Path(sys.executable))
         with (runtime / "server.log").open("a", encoding="utf-8") as log:
-            process = subprocess.Popen([executable, str(Path(__file__).resolve()), "--port", str(args.port)], cwd=ROOT, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+            process = subprocess.Popen([executable, str(Path(__file__).resolve()), "--port", str(args.port), "--host", args.host], cwd=ROOT, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         pid_file.write_text(str(process.pid))
         deadline = time.monotonic() + 45
         with httpx.Client(timeout=1, trust_env=False) as client:
@@ -73,7 +74,7 @@ def main():
                 time.sleep(.15)
         raise SystemExit("服务未在45秒内就绪，请查看runtime/server/server.log")
     from backend.app import create_app
-    uvicorn.run(create_app(), host="127.0.0.1", port=args.port, log_level="info")
+    uvicorn.run(create_app(), host=args.host, port=args.port, log_level="info")
 
 
 if __name__ == "__main__":

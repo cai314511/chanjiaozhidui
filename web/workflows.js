@@ -26,7 +26,7 @@ export function jobEditor(draft=null){
 }
 on('edit-job',el=>jobEditor(getJob(el.dataset.id)));
 export function bindJobActions(){
- document.querySelectorAll('.job-card [data-action="weight-job"]').forEach(el=>el.insertAdjacentHTML('beforebegin',button('编辑岗位与测评','edit-job',el.dataset.id)));
+ document.querySelectorAll('.job-card [data-action="weight-job"]').forEach(el=>{if(!el.closest('.job-card').querySelector('[data-action="edit-job"]'))el.insertAdjacentHTML('beforebegin',button('编辑岗位与测评','edit-job',el.dataset.id));});
  document.querySelectorAll('.job-card [data-action="application-detail"]').forEach(el=>el.insertAdjacentHTML('afterend',button('测评版本记录','assessment-history',el.dataset.id)));
 }
 on('assessment-history',async el=>{
@@ -66,7 +66,7 @@ on('application-detail',async el=>{
  const a=await api('/applications/'+el.dataset.id),portfolio=await Promise.all((a.portfolio_ids||[]).map(id=>api('/portfolio/'+id)));
  dialog('匹配与资料',`<h3>${e(a.job.title)}</h3>${scoreHtml(a.match)}${state.user.role==='employer'?`<details><summary>查看已授权学生介绍</summary><p class="pre">专业：${e(a.profile.major)}\n院校：${e(a.profile.school_name)}\n语言：${e(a.profile.language)}\n职业规划：${e(a.profile.career)}\n经历：${e(a.profile.experience)}</p></details>`:''}<h4 class="small-title">已授权资料</h4>${a.document_ids.map(id=>button('查看资料 '+id.slice(0,8),'document',id,'small')).join(' ')||'<p class="hint">未选择文档</p>'}${portfolio.length?'<h4 class="small-title">作品与视频</h4>'+portfolio.map(item=>`<section class="panel"><h4>${e(item.name)}</h4>${item.mime.startsWith('video/')?`<video controls preload="metadata" class="portfolio-video" src="/api/portfolio/${item.id}/file"></video>`:item.mime.startsWith('audio/')?`<audio controls src="/api/portfolio/${item.id}/file"></audio>`:item.mime.startsWith('image/')?`<img class="portfolio-image" src="/api/portfolio/${item.id}/file" alt="${e(item.name)}">`:`<a class="btn small" href="/api/portfolio/${item.id}/file" target="_blank" rel="noopener">查看作品</a>`}</section>`).join(''):''}<details><summary>测评回答与复核记录</summary>${Object.entries(a.answers||{}).map(([qid,answer])=>`<div class="source-block"><span>${e(qid)}</span><p>${e(answer)}</p></div>`).join('')}${(a.audio_ids||[]).map(id=>`<audio controls src="/api/audio/${e(id)}"></audio>`).join('')}${a.review?`<p class="hint">企业已复核；变更回答后需要重新核实。</p>${Object.entries(a.review.abilities).map(([skill,obs])=>`<p class="pre">${e(skill)}\n${e(obs.evidence)}</p>`).join('')}`:'<p class="hint">尚未完成企业复核</p>'}</details>`);
 });
-on('choice',async el=>{const a=state.applications.find(a=>a.id===el.dataset.id);const chosen=state.user.role==='employer'?a.employer_chosen:a.student_chosen;await post('/applications/'+a.id+'/choice',{chosen:!chosen});await refresh();navigate('applications');toast(chosen?'已取消选择':'已记录选择');});
+on('choice',async el=>{const a=state.applications.find(a=>a.id===el.dataset.id);const chosen=state.user.role==='employer'?a.employer_chosen:a.student_chosen;await post('/applications/'+a.id+'/choice',{chosen:!chosen});await refresh();closeDialog();navigate('applications');toast(chosen?'已取消选择':'已记录选择');});
 on('withdraw',el=>dialog('撤回投递',`<p>撤回后，该企业将立即失去当前投递资料与测评的访问权限。</p><div class="form-actions">${button('取消','close-modal')}${button('确认撤回','confirm-withdraw',el.dataset.id,'danger')}</div>`));
 on('confirm-withdraw',async el=>{await post('/applications/'+el.dataset.id+'/withdraw',{});await refresh();closeDialog();navigate('applications');toast('投递已撤回');});
 

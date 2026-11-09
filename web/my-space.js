@@ -39,6 +39,10 @@ function mediaHTML(item){
 }
 export async function publishedStudentsPage(){
  const students=await api('/students');
+ if(state.user?.role==='employer'){
+  const candidates=await api('/recruiting/candidates'),ids=new Set(candidates.map(c=>c.id));
+  return heading('学生主页','查看意向学生的主页、授权简历与作品。')+`<div class="student-directory">${candidates.map(c=>`<article class="panel student-card"><span class="space-avatar space-initial">${e(c.name.slice(0,1))}</span><div><span class="eyebrow">${e(c.school)}</span><h3>${e(c.name)}</h3><p>${e(c.career)}</p><span class="tag">已投递本公司岗位</span></div><div class="inline">${button('主页与简历','candidate-detail',c.id,'primary')}${button(c.favorite?'取消收藏':'收藏人才',c.favorite?'candidate-unstar':'candidate-star',c.id,'small')}${button('联系','contact-person',c.id,'small')}</div></article>`).join('')}${students.filter(s=>!ids.has(s.id)).map(s=>`<article class="panel student-card">${avatar(s)}<div><h3>${e(s.display_name)}</h3><p>${e(s.headline)}</p></div>${button('查看公开主页','student-page',s.id)}</article>`).join('')||empty('等待学生发布或投递','学生提交投递后，授权的主页与简历会出现在这里。')}</div>`;
+ }
  return heading('学生主页','从真实经历与作品，认识每个人的兴趣和方向。')+`<div class="student-directory">${students.length?students.map(student=>`<article class="panel student-card">${avatar(student)}<div><span class="eyebrow">${e(student.school||'学生主页')}</span><h3>${e(student.display_name||'学生')}</h3><p>${e(student.headline||student.major||'探索新的方向')}</p><div class="chips">${tags((student.interests||[]).slice(0,4))}</div></div>${button('查看主页','student-page',student.id,'primary')}</article>`).join(''):empty('还没有发布的学生主页','学生保存并发布自己的主页后，会展示在这里。')}</div>`;
 }
 

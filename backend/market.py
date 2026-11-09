@@ -232,7 +232,7 @@ def _market_view(store):
         jobs = []
         for item in store.list('job'):
             data = item['data']
-            if data.get('deleted') or data.get('closed') or data.get('status') in {'draft', 'closed', 'archived'}:
+            if data.get('deleted') or data.get('closed') or data.get('status') in {'draft', 'paused', 'closed', 'archived'}:
                 continue
             profile = profiles.get(item['owner'], {})
             name = profile.get('name') or data.get('company', '')

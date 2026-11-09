@@ -4,7 +4,7 @@ from pathlib import Path
 
 from playwright.sync_api import expect
 
-from tests.test_browser import browser_system
+from tests.test_browser import browser_system, route
 
 
 def test_local_logo_in_company_list_detail_and_image_failure(browser_system):
@@ -16,6 +16,7 @@ def test_local_logo_in_company_list_detail_and_image_failure(browser_system):
     })
     assert response.status == 200
     page.goto(base)
+    route(page,'company')
     card = page.locator('.discovery-company').filter(has=page.locator('h4', has_text='7-ELEVEn'))
     image = card.locator('.company-symbol img')
     expect(image).to_be_visible()
@@ -35,11 +36,13 @@ def test_local_logo_in_company_list_detail_and_image_failure(browser_system):
     page.screenshot(path=str(folder / 'list.png'))
     page.route('**/api/company-logos/*', lambda route: route.fulfill(status=404, body=''))
     page.reload()
+    route(page,'company')
     expect(card.locator('.company-initial')).to_be_visible()
     expect(card.locator('.company-symbol img')).to_be_hidden()
     # 未核验企业由正式市场接口保持字母占位。
     page.request.put(base + '/api/company/profile', data={'name': '隔离无商标企业', 'tracks': ['零售消费'], 'description': ''})
     page.reload()
+    route(page,'company')
     pending = page.locator('.discovery-company').filter(has=page.locator('h4', has_text='隔离无商标企业'))
     expect(pending.locator('.company-initial')).to_have_text('隔')
     expect(pending.locator('img')).to_have_count(0)

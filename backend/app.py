@@ -24,10 +24,13 @@ from backend.presentation import public_product, parameter_question, PARAMETER_R
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def create_app(data_root=None):
+def create_app(data_root=None, enable_demo=True):
     app = FastAPI(title="智链产教", docs_url="/api/docs", redoc_url=None)
     store = Store(Path(data_root) if data_root else ROOT / "data" / "private")
     app.state.store = store
+    if data_root is None:
+        from backend.reference_data import import_reference
+        import_reference(store)
     attempts = {}
 
     @app.middleware("http")
@@ -252,6 +255,10 @@ def create_app(data_root=None):
     @app.get("/api/jobs")
     def jobs(current=Depends(user)):
         rows = [flat(item) for item in store.list("job")]
+        if current['role']=='employer':
+            rows=[j for j in rows if j['owner']==current['id']]
+        else:
+            rows=[j for j in rows if j.get('status','published')=='published']
         for job in rows:
             job['priorities'] = job.get('priorities', {r['skill']: '重点关注' for r in job['requirements']})
         return public_product(rows)
@@ -259,7 +266,9 @@ def create_app(data_root=None):
     @app.post("/api/jobs")
     def create_job(payload: s.Job, current=Depends(user)):
         role(current, ["employer"])
-        data = {**payload.model_dump(), "company": current["name"], "version": 1}
+        companies=store.list('company_profile',current['id'])
+        company=companies[0]['data'].get('name',current['name']) if companies else current['name']
+        data = {**payload.model_dump(), "company": company, "version": 1, "status":"published"}
         ident = store.save("job", current["id"], data)
         with store.connect() as db:
             db.execute("INSERT INTO job_versions VALUES(?,?,?,?)", (ident, 1, encode(data), now()))
@@ -275,6 +284,9 @@ def create_app(data_root=None):
             row = db.execute("SELECT data FROM entities WHERE id=?", (ident,)).fetchone()
             if json.loads(row["data"])["version"] != version:
                 raise HTTPException(409, "岗位已更新，请重新载入后修改")
+            original_data=json.loads(row['data'])
+            data['company']=original_data.get('company',current['name'])
+            data['status']=original_data.get('status','published')
             previous = {r['skill']: r for r in json.loads(row['data'])['requirements']}
             previous_priorities = json.loads(row['data']).get('priorities', {})
             data['priorities'] = {r['skill']: previous_priorities.get(r['skill'], '重点关注') for r in data['requirements']}
@@ -322,6 +334,9 @@ def create_app(data_root=None):
                 latest = db.execute("SELECT data FROM entities WHERE id=?", (ident,)).fetchone()
                 if json.loads(latest["data"])["version"] != payload.version:
                     raise HTTPException(409, "权重被其他会话更新，请重新载入")
+                latest_data=json.loads(latest['data'])
+                data['status']=latest_data.get('status','published')
+                data['company']=latest_data.get('company',data['company'])
                 db.execute("UPDATE entities SET data=?,updated=? WHERE id=?", (encode(data), now(), ident))
                 db.execute("INSERT INTO job_versions VALUES(?,?,?,?)", (ident, data["version"], encode(data), now()))
             store.audit(current["id"], "weights_version", ident)
@@ -358,7 +373,9 @@ def create_app(data_root=None):
     @app.post("/api/applications")
     def apply(payload: s.Apply, current=Depends(user)):
         role(current, ["student"])
-        entity(payload.job_id, "job")
+        target=entity(payload.job_id, "job")
+        if target['data'].get('status','published')!='published':
+            raise HTTPException(409,'该岗位暂不接受新的投递')
         for doc_id in payload.document_ids:
             owned(doc_id, current, "document")
         for ident in payload.portfolio_ids:
@@ -702,6 +719,11 @@ def create_app(data_root=None):
     attach_university_intelligence(app, store, user)
     from backend.experience_api import attach_experience
     attach_experience(app, store, user, role, owned, entity, flat, application_access, agent_run, updated_weights)
+    from backend.recruiting import attach_recruiting
+    attach_recruiting(app, store, user, flat, application_result)
+    if enable_demo:
+        from backend.demo import DemoRouter
+        app.add_middleware(DemoRouter, root=store.root / 'demo', factory=create_app)
 
     app.mount("/assets", StaticFiles(directory=ROOT / "web"), name="assets")
 

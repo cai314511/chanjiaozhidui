@@ -1,4 +1,4 @@
-export const state = {user:null,publicDemo:false,sessionEpoch:0,health:{},route:'home',industry:'',jobs:[],applications:[],documents:[],profile:null,messages:[],agentContext:{},agentDraft:null};
+export const state = {user:null,demo:false,publicDemo:false,sessionEpoch:0,health:{},route:'home',industry:'',jobs:[],applications:[],documents:[],profile:null,messages:[],agentContext:{},agentDraft:null};
 export const sessionRequests = new Set();
 export function resetIdentity(){state.publicDemo=false;state.pendingProfileDraft=null;sessionStorage.removeItem('publicDemo');state.sessionEpoch++;window.dispatchEvent(new Event('identity-reset'));for(const controller of sessionRequests)controller.abort();sessionRequests.clear();state.messages=[];state.agentContext={};state.agentDraft=null;state.profile=null;document.querySelector('#agent-drawer').hidden=true;}
 export const actions = {};

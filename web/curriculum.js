@@ -18,6 +18,26 @@ export async function bindCurriculum(){
   const profile=await serverApi('/profile');if(!form.isConnected)return;
   for(const [key,resource] of [['cost','budget'],['study_hours','study_hours'],['months','months']])form.querySelector('[name="limit-'+key+'"]').value=profile.resources?.[resource]??0;
  }
+ if(state.demo){
+  const plans=await api('/university/plans');if(!form.isConnected)return;
+  const saved=plans[0]?.input;
+  if(saved){
+   document.querySelector('#gap-rows').innerHTML=Object.entries(saved.gaps).map(([skill,gap])=>gapRow(skill,gap,saved.weights[skill])).join('');
+   for(const [key,value] of Object.entries(saved.limits))form.querySelector('[name="limit-'+key+'"]').value=value;
+   const host=document.querySelector('#course-cards');
+   for(const course of saved.courses){
+    host.insertAdjacentHTML('beforeend',courseCard(Object.keys(saved.gaps)));
+    const card=host.lastElementChild;card.dataset.courseId=course.id;
+    card.querySelector('[name=course-name]').value=course.name;
+    for(const key of ['cost','credits','teacher_hours','lab_hours','study_hours','months']){
+     const input=card.querySelector('[name="course-'+key+'"]');input.value=course[key];
+     if(state.user.role==='student'&&['credits','teacher_hours','lab_hours'].includes(key))input.closest('.field').hidden=true;
+    }
+    card.querySelectorAll('[data-gain]').forEach(input=>input.value=course.gains[input.dataset.gain]);
+   }
+   document.querySelector('#curriculum-result').innerHTML=resultHtml(plans[0].result,saved.courses);
+  }
+ }
  form.addEventListener('submit',async event=>{
   event.preventDefault();
   try{const {gaps,weights}=readGaps(),d=values(form);const limits=Object.fromEntries(['cost','credits','teacher_hours','lab_hours','study_hours','months'].map(k=>[k,num(d['limit-'+k])]));
