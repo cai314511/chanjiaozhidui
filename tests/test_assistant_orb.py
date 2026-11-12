@@ -75,10 +75,18 @@ def test_assistant_glass_in_actual_panel_dimensions(browser_system):
     folder.mkdir(parents=True, exist_ok=True)
     page.locator('#agent-drawer').screenshot(path=str(folder / 'assistant-panel-desktop.png'))
     stage.screenshot(path=str(folder / 'assistant-stage-desktop.png'))
-    assert 390 <= stage.bounding_box()['width'] <= 460
+    # 水滴置于标题栏，给对话和始终可见的输入区留出空间。
+    assert 24 <= stage.bounding_box()['width'] <= 56
+    expect(page.locator('.drawer-head .agent-orb-stage')).to_have_count(1)
+    for selector in ['#agent-form textarea', '#agent-form .agent-speech', '#agent-form [type=submit]']:
+        box = page.locator(selector).bounding_box()
+        assert box['y'] >= 0 and box['y'] + box['height'] <= 960
     page.set_viewport_size({'width': 390, 'height': 844})
     page.locator('#agent-drawer').screenshot(path=str(folder / 'assistant-panel-mobile.png'))
     assert stage.bounding_box()['width'] <= 390
+    for selector in ['#agent-form textarea', '#agent-form .agent-speech', '#agent-form [type=submit]']:
+        box = page.locator(selector).bounding_box()
+        assert box['y'] >= 0 and box['y'] + box['height'] <= 844
     page.locator('[data-action=close-agent]').click()
     expect(stage.locator('canvas')).to_have_count(0)
     page.close()

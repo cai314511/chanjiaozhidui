@@ -1,5 +1,5 @@
 import {state,actions,e,roleNames,api,post,on,navigate,refresh,toast,paintBars,sessionRequests} from './core.js';
-import {jobs,applications,documentsPage,allocationPage,universityPage,auth} from './views.js';
+import {jobs,applications,documentsPage,allocationPage,auth} from './views.js';
 import {bindAllocation,bindJobActions} from './workflows.js';
 import {profilePage,bindProfile,weightsPage,loadWeights,guidancePage,appendPortfolio,inputHub,installInputHelpers} from './product.js';
 import {installGlass,updateGlass} from './glass.js';
@@ -7,12 +7,13 @@ import './voice.js';
 import {curriculumPage,bindCurriculum} from './curriculum.js';
 import {openAssistant,closeAssistant} from './assistant.js';
 import {researchDataPage,decisionPage,rulesPage,bindCompetition} from './competition.js';
-import {administrationPage,schoolProfilePanel} from './administration.js';
+import {administrationPage} from './administration.js';
 import {evidencePage,evidenceTeaser,bindEvidence} from './evidence.js';
 import {discoveryHome,bindDiscovery} from './discovery.js';
 import {mySpacePage,publishedStudentsPage,bindMySpace} from './my-space.js';
 import {universityInputHub,bindUniversityCourses,universityMaterialsPage} from './university-courses.js';
 import {universityIntelligencePage,bindUniversityIntelligence} from './university-intelligence.js';
+import {universityReportPage,bindUniversityReport} from './university-report.js';
 import {bindRoleMascots} from './role-mascots.js';
 import {demoToolbar,recruitingHome,employerJobs,candidatesPage,companyPage,messagesPage,bindRecruiting,employerInputHub} from './recruiting.js';
 
@@ -75,7 +76,7 @@ async function render(){
    case'applications':html=state.user?.role==='employer'?await candidatesPage():applications();break;
    case'weights':html=weightsPage();break;
    case'allocation':html=allocationPage();break;
-   case'university':html=await schoolProfilePanel()+await universityPage();break;
+   case'university':html=await universityReportPage();break;
    case'curriculum':html=await curriculumPage();break;
    case'documents':html=state.user?.role==='university'?await universityMaterialsPage():await documentsPage();break;
    case'research':html=await evidenceTeaser()+await researchDataPage();break;
@@ -89,9 +90,10 @@ async function render(){
   bindRoleMascots();
   bindProfile();bindAllocation();bindJobActions();bindCompetition();await bindCurriculum();await bindEvidence();bindMySpace();await bindDiscovery();
   await bindRecruiting();
-  if(state.user&&!state.publicDemo&&['jobs','university','curriculum','decision','research'].includes(state.route))document.querySelector('#page-content .section-head')?.insertAdjacentHTML('afterend',state.user.role==='university'?universityInputHub():state.user.role==='employer'?employerInputHub():inputHub());
+  if(state.user&&!state.publicDemo&&['jobs','curriculum','decision','research'].includes(state.route))document.querySelector('#page-content .section-head')?.insertAdjacentHTML('afterend',state.user.role==='university'?universityInputHub():state.user.role==='employer'?employerInputHub():inputHub());
   bindUniversityCourses();
   await bindUniversityIntelligence();
+  await bindUniversityReport();
   if(state.route==='documents'&&state.user.role!=='university')await appendPortfolio();
   if(sequence!==renderSequence)return;
   if(sequence!==renderSequence)return;

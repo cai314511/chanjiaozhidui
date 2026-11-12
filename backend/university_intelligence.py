@@ -1,16 +1,14 @@
 """高校需求观察：全量历史公告聚合、站内岗位及本校匿名学生数据。"""
 
-import csv
-import hashlib
 import math
 import threading
 from collections import Counter, defaultdict
-from datetime import date
 from pathlib import Path
 
 from fastapi import Depends, HTTPException, Query
 
-from backend.evidence import PATTERNS, safe_text, salary_interval, sha256_file
+from backend.evidence import PATTERNS, safe_text, sha256_file
+from backend.recruitment_data import normalize_recruitment, read_recruitment, recruitment_fingerprint
 from backend.market import EXPLORATION_OPTIONS, TRACK_RULES, _tracks, company_id, normalized_company
 from backend.store import encode, now
 
@@ -26,53 +24,46 @@ def build_demand(paths):
     """扫描全量CSV，按公告摘要跨文件去重，不读取市场目录的岗位样本。"""
     paths = [Path(path) for path in paths]
     industries, sources = defaultdict(set), []
-    required = {'企业名称', '招聘岗位', '工作城市', '最低月薪', '最高月薪', '职位描述', '招聘发布日期'}
     for path in paths:
         source = {'name': path.name, 'sha256': sha256_file(path), 'scanned_rows': 0}
-        with path.open(encoding='utf-8-sig', newline='') as handle:
-            reader = csv.DictReader(handle)
-            if not required <= set(reader.fieldnames or []):
-                raise ValueError(f'{path.name}缺少必要字段：{sorted(required - set(reader.fieldnames or []))}')
-            for row in reader:
-                source['scanned_rows'] += 1
-                industry = safe_text(row.get('上市公司行业', '')).strip()
-                if row['企业名称'].strip() and industry:
-                    industries[normalized_company(row['企业名称'])].add(industry)
+        for _, row in read_recruitment(path):
+            source['scanned_rows'] += 1
+            industry = safe_text(row.get('上市公司行业', '')).strip()
+            if row['企业名称'].strip() and industry:
+                industries[normalized_company(row['企业名称'])].add(industry)
         sources.append(source)
     groups, seen = {}, set()
     duplicate_rows = invalid_dates = unnamed_rows = 0
     dates = []
+    quality = Counter()
     for path in paths:
-        with path.open(encoding='utf-8-sig', newline='') as handle:
-            for row in csv.DictReader(handle):
-                name = safe_text(row['企业名称']).strip()
-                if not name:
-                    unnamed_rows += 1
-                    continue
-                title, city = safe_text(row['招聘岗位'])[:180], safe_text(row['工作城市'])[:80] or '未注明'
-                key = normalized_company(name)
-                try:
-                    published = date.fromisoformat(row['招聘发布日期'].strip()[:10]).isoformat()
-                except ValueError:
-                    published = ''
-                fingerprint = hashlib.sha256(encode([key, title, city if city != '未注明' else '',
-                    salary_interval(row['最低月薪'], row['最高月薪']), published, row['职位描述']]).encode()).hexdigest()
-                if fingerprint in seen:
-                    duplicate_rows += 1
-                    continue
-                seen.add(fingerprint)
-                if published:
-                    dates.append(published)
-                else:
-                    invalid_dates += 1
-                month = published[:7] if published else '日期未注明'
-                tracks = tuple(_tracks(industries.get(key, set())))
-                group = groups.setdefault((month, city, tracks), {'month': month, 'city': city, 'tracks': list(tracks),
-                    'postings': 0, 'skills': Counter(), 'companies': set()})
-                group['postings'] += 1
-                group['companies'].add(company_id(name))
-                text = title + '\n' + row['职位描述']
-                group['skills'].update(skill for skill, pattern in PATTERNS.items() if pattern.search(text))
+        for _, row in read_recruitment(path):
+            name = safe_text(row['企业名称']).strip()
+            if not name:
+                unnamed_rows += 1
+                continue
+            title, city = safe_text(row['招聘岗位'])[:180], safe_text(row['工作城市'])[:80] or '未注明'
+            key = normalized_company(name)
+            normalized = normalize_recruitment(row)
+            quality.update(normalized['issues'])
+            published = normalized['published']
+            fingerprint = recruitment_fingerprint(row, normalized)
+            if fingerprint in seen:
+                duplicate_rows += 1
+                continue
+            seen.add(fingerprint)
+            if published:
+                dates.append(published)
+            else:
+                invalid_dates += 1
+            month = published[:7] if published else '日期未注明'
+            tracks = tuple(_tracks(industries.get(key, set())))
+            group = groups.setdefault((month, city, tracks), {'month': month, 'city': city, 'tracks': list(tracks),
+                'postings': 0, 'skills': Counter(), 'companies': set()})
+            group['postings'] += 1
+            group['companies'].add(company_id(name))
+            text = title + '\n' + row['职位描述']
+            group['skills'].update(skill for skill, pattern in PATTERNS.items() if pattern.search(text))
     built_at = now()
     for group in groups.values():
         group['skills'] = dict(group['skills'])
@@ -81,8 +72,8 @@ def build_demand(paths):
             'history_period': f'{min(dates)} 至 {max(dates)}' if dates else '未接入有效日期的历史公告',
             'source_meta': {'ready': True, 'sources': sources, 'scanned_rows': sum(source['scanned_rows'] for source in sources),
                 'deduplicated_postings': len(seen), 'duplicate_rows': duplicate_rows, 'invalid_dates': invalid_dates,
-                'unnamed_rows': unnamed_rows, 'built_at': built_at},
-            'method': '全量CSV按标准化企业全名、岗位、城市、薪资、日期与原始正文摘要去重；原始行业及同名企业行业证据作宽泛赛道归类，缺证据保留未分类。技能为标题或正文词项命中，每公告每技能最多计一次。'}
+                'unnamed_rows': unnamed_rows, 'built_at': built_at, 'quality_issues': dict(quality)},
+            'method': '全量CSV按企业全名、岗位、城市区域、薪资、完整日期、原始正文和标准化资格条件去重；关联上市公司行业及同名招聘主体证据仅作宽泛赛道参考，不认定发布法人行业，缺证据保留未分类。技能为标题或正文词项命中，每公告每技能最多计一次。'}
 
 
 def publish_demand(store, bundle):
@@ -276,7 +267,8 @@ def attach_university_intelligence(app, store, user):
             'student_goals': [{'name': name, 'count': count} for name, count in goals.most_common()],
             'coverage': [{'skill': row['name'], 'course_count': course_counts[row['name']] if course_counts is not None else None} for row in skills],
             'links': [{'source': '赛道：' + sector, 'target': '技能：' + skill, 'value': count} for (sector, skill), count in links.most_common()],
-            'notes': ['历史需求来自两份本地2026招聘CSV全量去重统计，未使用企业近期样本推算市场。',
+            'notes': ['历史需求来自已导入招聘CSV全量去重统计，实际期间见历史观察期；未使用企业近期样本推算市场。',
+                '历史赛道参考关联上市公司行业及同名招聘主体证据，不认定发布法人行业或工商行业编码。',
                 '平台岗位为当前站内已发布岗位，每次请求重新读取；未接入外部实时招聘数据。',
                 '公告条数不是招聘人数；多赛道公告分别计入各赛道，赛道数不可直接相加为公告总数。',
                 '历史技能为词项出现频次，未从招聘正文推断能力等级。目标等级只来自真实站内岗位的显式能力要求。',

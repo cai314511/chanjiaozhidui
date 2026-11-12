@@ -83,7 +83,7 @@ def test_agent_voice_confirmation_and_webgl_fallback(browser_system, role):
     speech = page.locator('#agent-form .agent-speech')
     speech.click()
     expect(page.locator('#agent-orb-status')).to_have_text('正在倾听')
-    page.wait_for_function("window.testMicTracks && document.querySelector('.agent-orb-stage').dataset.volume > 0")
+    page.wait_for_function("()=>window.testMicTracks && document.querySelector('.agent-orb-stage').dataset.volume > 0")
     speech.click()
     expect(page.locator('#agent-form textarea')).to_have_value('隔离转写，可编辑')
     assert not requests

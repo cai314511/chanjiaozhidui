@@ -1,13 +1,11 @@
 """全行业本地招聘目录、企业档案与学生收藏；历史公告不进入发布动态。"""
 
-import csv
 import hashlib
 import json
 import re
 import threading
 import unicodedata
 from collections import Counter
-from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +13,7 @@ from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from backend.evidence import safe_text, salary_interval, sha256_file
+from backend.recruitment_data import normalize_recruitment, read_recruitment, recruitment_fingerprint
 from backend.store import encode, now
 
 
@@ -95,84 +94,80 @@ def build_market(paths, samples_per_company=2):
     industry_map = {}
     industry_sources = {}
     sources = []
-    # 独立第一遍使缺行业文件不依赖输入顺序地引用同名企业行业证据。
+    # 原字段是关联上市公司行业，仅用于赛道参考，不认定发布法人的工商行业。
     for path in paths:
         source = {'id': hashlib.sha256(path.name.encode()).hexdigest()[:20],
                   'name': path.name, 'sha256': sha256_file(path), 'rows': 0}
-        with path.open(encoding='utf-8-sig', newline='') as handle:
-            reader = csv.DictReader(handle)
-            required = {'企业名称', '招聘岗位', '工作城市', '最低月薪', '最高月薪', '职位描述', '招聘发布日期'}
-            if not required <= set(reader.fieldnames or []):
-                raise ValueError(f'{path.name}缺少必要字段：{sorted(required - set(reader.fieldnames or []))}')
-            previous_line = 1
-            for row in reader:
-                line, previous_line = previous_line + 1, reader.line_num
-                source['rows'] += 1
-                industry = safe_text(row.get('上市公司行业', '')).strip()
-                if industry and row['企业名称'].strip():
-                    key = normalized_company(row['企业名称'])
-                    industry_map.setdefault(key, set()).add(industry)
-                    industry_sources.setdefault(key, {}).setdefault((industry, path.name),
-                        {'industry': industry, 'file': path.name, 'line': line})
+        for line, row in read_recruitment(path):
+            source['rows'] += 1
+            industry = safe_text(row.get('上市公司行业', '')).strip()
+            if industry and row['企业名称'].strip():
+                key = normalized_company(row['企业名称'])
+                industry_map.setdefault(key, set()).add(industry)
+                industry_sources.setdefault(key, {}).setdefault((industry, path.name),
+                        {'industry': industry, 'file': path.name, 'line': line,
+                         'basis': '关联上市公司行业，非发布法人核实行业'})
         sources.append(source)
     companies = {}
     fingerprints = {}
     duplicates = unnamed = 0
+    quality = Counter()
     for path, source in zip(paths, sources):
-        with path.open(encoding='utf-8-sig', newline='') as handle:
-            reader = csv.DictReader(handle)
-            previous_line = 1
-            for row in reader:
-                line, previous_line = previous_line + 1, reader.line_num
-                name = safe_text(row['企业名称']).strip()
-                if not name:
-                    unnamed += 1
-                    continue
-                key = normalized_company(name)
-                company = companies.setdefault(key, {
-                    'id': company_id(name), 'name': name,
-                    'tracks': _tracks(industry_map.get(key, set())),
-                    'raw_industries': sorted(industry_map.get(key, set())),
-                    'industry_evidence': list(industry_sources.get(key, {}).values()),
-                    'sources': [], 'history_count': 0, 'historical_jobs': [], 'search_terms': set(),
-                })
-                if source['name'] not in company['sources']:
-                    company['sources'].append(source['name'])
-                title = safe_text(row['招聘岗位'])[:180]
-                company['search_terms'].add(title)
-                try:
-                    published = date.fromisoformat(row['招聘发布日期'].strip()[:10]).isoformat()
-                except ValueError:
-                    published = ''
-                salary = salary_interval(row['最低月薪'], row['最高月薪'])
-                city = safe_text(row['工作城市'])[:80]
-                fingerprint = hashlib.sha256(encode([key, title, city, salary, published, row['职位描述']]).encode()).hexdigest()
-                seen = fingerprints.setdefault(key, set())
-                if fingerprint in seen:
-                    duplicates += 1
-                    continue
-                seen.add(fingerprint)
-                company['history_count'] += 1
-                sample = {'id': fingerprint[:24], 'title': title, 'city': city, 'salary': salary,
-                          'published': published, 'company_id': company['id'], 'company': name,
-                          'tracks': company['tracks'], 'type': 'historical',
-                          'source': {'file': source['name'], 'line': line, 'source_id': source['id']},
-                          'industry_source': '原始行业字段或标准化全名相同企业的原始行业字段' if company['raw_industries'] else '缺少行业证据',
-                          'education': safe_text(row.get('学历要求', ''))[:80],
-                          'description': safe_text(row['职位描述'])[:240]}
-                samples = company['historical_jobs']
-                if len(samples) < samples_per_company or (published, sample['id']) > (samples[-1]['published'], samples[-1]['id']):
-                    samples.append(sample)
-                    samples.sort(key=lambda job: (job['published'], job['id']), reverse=True)
-                    del samples[samples_per_company:]
+        for line, row in read_recruitment(path):
+            name = safe_text(row['企业名称']).strip()
+            if not name:
+                unnamed += 1
+                continue
+            key = normalized_company(name)
+            company = companies.setdefault(key, {
+                'id': company_id(name), 'name': name,
+                'tracks': _tracks(industry_map.get(key, set())),
+                'raw_industries': sorted(industry_map.get(key, set())),
+                'industry_evidence': list(industry_sources.get(key, {}).values()),
+                'sources': [], 'history_count': 0, 'historical_jobs': [], 'search_terms': set(),
+            })
+            if source['name'] not in company['sources']:
+                company['sources'].append(source['name'])
+            title = safe_text(row['招聘岗位'])[:180]
+            company['search_terms'].add(title)
+            normalized = normalize_recruitment(row)
+            quality.update(normalized['issues'])
+            published = normalized['published']
+            salary = salary_interval(row['最低月薪'], row['最高月薪'])
+            city = safe_text(row['工作城市'])[:80]
+            fingerprint = recruitment_fingerprint(row, normalized)
+            seen = fingerprints.setdefault(key, set())
+            if fingerprint in seen:
+                duplicates += 1
+                continue
+            seen.add(fingerprint)
+            company['history_count'] += 1
+            sample = {'id': fingerprint[:24], 'title': title, 'city': city, 'salary': salary,
+                      'published': published, 'company_id': company['id'], 'company': name,
+                      'tracks': company['tracks'], 'type': 'historical',
+                      'source': {'file': source['name'], 'line': line, 'source_id': source['id'],
+                                 'channel': safe_text(row.get('来源')), 'platform': safe_text(row.get('来源平台'))},
+                      'industry_source': '关联上市公司行业参考（含同名招聘主体证据），非发布法人核实行业' if company['raw_industries'] else '缺少行业证据',
+                      'education': safe_text(normalized['education'])[:80],
+                      'experience': safe_text(normalized['experience'])[:80],
+                      'employment_type': safe_text(normalized['employment_type']),
+                      'headcount': normalized['headcount'], 'headcount_verified': False,
+                      'published_year': normalized['published_year'], 'ended_year': normalized['ended_year'],
+                      'raw_requirements': {key: safe_text(value) for key, value in normalized['raw_requirements'].items()},
+                      'description': safe_text(row['职位描述'])[:240]}
+            samples = company['historical_jobs']
+            if len(samples) < samples_per_company or (published, sample['id']) > (samples[-1]['published'], samples[-1]['id']):
+                samples.append(sample)
+                samples.sort(key=lambda job: (job['published'], job['id']), reverse=True)
+                del samples[samples_per_company:]
     for company in companies.values():
         company['search_terms'] = sorted(company['search_terms'])
     return {'version': 1, 'created_at': now(), 'sources': sources,
             'scanned_rows': sum(source['rows'] for source in sources), 'duplicate_rows': duplicates,
-            'unnamed_rows': unnamed, 'samples_per_company': samples_per_company,
+            'unnamed_rows': unnamed, 'samples_per_company': samples_per_company, 'quality_issues': dict(quality),
             'companies': sorted(companies.values(), key=lambda company: company['name']),
             'scope': '用户提供的本地招聘CSV历史公告；完整企业目录、全量标题检索与每企业近期公告样本。',
-            'method': '行业来自原始上市公司行业字段；按标准化企业全名精确引用同名企业证据，再按行业关键词作宽泛赛道归类。没有证据标未分类。未按公司简称、集团关系或岗位名称推断行业。重复公告依据企业、岗位、城市、日期、薪资及原始正文摘要去重。'}
+            'method': '赛道参考关联上市公司行业，按标准化企业全名引用同名招聘主体证据；不认定发布法人行业，不视作已确认的GB/T分类。缺证据标未分类。重复公告按企业、岗位、城市区域、完整日期、薪资、原始正文及标准化资格条件去重。人数仅为公告拟招人数。'}
 
 
 def publish_market(store, bundle):

@@ -37,11 +37,6 @@ export function modelPage(){return heading('评分与决策依据','每次匹配
 
 export function allocationPage(){return heading('招聘资源分配','在双方已选择、证据核验完整且必要条件通过的候选对中计算分配建议。')+`<form id="allocation-form" class="panel"><h3>本次招聘资源上限</h3><div class="grid3">${field('月度薪资总预算（元）','salary','','number','min="0" required')}${field('培训总预算（元）','training','','number','min="0" required')}${field('导师可投入总课时','mentor','','number','min="0" required')}</div><p class="hint">每位学生最多分配一个岗位，每个岗位不超过名额。薪资使用岗位薪资上限测算；培训成本与导师课时使用岗位录入值。</p><button class="btn primary" type="submit">计算分配建议</button></form><div id="allocation-result"></div>`;}
 
-export async function universityPage(){
- const data=await api('/university/insights');
- return heading('高校培养诊断','从站内岗位与本校授权资料中识别能力缺口。')+`<div class="panel"><h3>${e(state.user.name)}</h3><p class="hint">将入校码提供给本校学生，学生在个人画像中填写后加入本校汇总。当前为本地注册组织。</p><div class="readonly">入校码：${e(state.user.school_code)}</div></div>`+(data.suppressed?empty('等待足够的本校样本',data.message):`<div class="panel"><h3>培养能力与岗位要求</h3><p class="hint">${e(data.basis)} · 授权样本 ${data.sample_count} 人。单项技能同样要求至少5名学生有记录。</p>${data.skills.length?`<div class="table-wrap"><table><thead><tr><th>技能</th><th>岗位要求均值</th><th>自述供给均值</th><th>缺口</th><th>样本</th></tr></thead><tbody>${data.skills.map(r=>`<tr><td>${e(r.skill)}</td><td>${r.target}</td><td>${r.supply}</td><td>${r.gap}</td><td>${r.count}</td></tr>`).join('')}</tbody></table></div>`:empty('暂无满足展示条件的技能','每项能力需要至少5名本校学生提供记录。')}</div>`)+`<div class="panel"><h3>将缺口转化为培养方案</h3><p class="hint">录入课程或实践项目、预期能力增益与投入资源，比较约束下的最优组合。</p>${button('进入培养方案优化','go-curriculum','','primary')}</div>`;
-}
-
 on('enter-role',el=>{if(!state.user){auth('register',el.dataset.id);return;}if(state.user.role!==el.dataset.id){auth('login',el.dataset.id);return;}navigate(state.user.role==='student'?'profile':state.user.role==='employer'?'jobs':'university');});
 on('go-jobs',()=>navigate('jobs'));
 on('go-curriculum',()=>navigate('curriculum'));

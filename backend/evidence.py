@@ -1,17 +1,15 @@
 """本机比赛资料的可复算处理与只读研究接口。"""
 
-import csv
 import hashlib
-import math
 import re
 from collections import Counter
-from datetime import date
 from pathlib import Path
 from statistics import median
 
 from fastapi import Depends, HTTPException, Query
 
 from backend.governance import redact
+from backend.recruitment_data import normalize_recruitment, read_recruitment, recruitment_fingerprint, salary_interval
 from backend.store import encode, now
 
 
@@ -46,16 +44,6 @@ def safe_text(text, company=''):
     return redact(text).strip()
 
 
-def salary_interval(low, high):
-    try:
-        low, high = float(low), float(high)
-    except (TypeError, ValueError):
-        return None
-    if not all(math.isfinite(v) and 0 < v <= 1_000_000 for v in (low, high)) or low > high:
-        return None
-    return [round(low, 2), round(high, 2)]
-
-
 def classify(title, industry):
     if re.search(r'人工智能|机器学习|深度学习|算法|大模型|自然语言|计算机视觉|机器人|(?<![a-z])AI(?:GC)?(?![a-z])|AI产品|AI工程|AI应用|智能产品', title, re.I):
         return 'AI产品'
@@ -68,56 +56,55 @@ def classify(title, industry):
 
 def build_recruitment(paths):
     jobs, sources = {}, []
+    quality = Counter()
     scanned = matched = duplicates = invalid_dates = 0
     for path in paths:
         path = Path(path)
         source_id = hashlib.sha256(path.name.encode()).hexdigest()[:20]
         source = {'id': source_id, 'name': path.name, 'sha256': sha256_file(path),
-                  'scanned_rows': 0, 'matched_rows': 0, 'period': '2026年，文件内实际月份见统计'}
-        with path.open(encoding='utf-8-sig', newline='') as handle:
-            reader = csv.DictReader(handle)
-            required = {'招聘岗位', '工作城市', '最低月薪', '最高月薪', '职位描述', '招聘发布日期'}
-            if not required <= set(reader.fieldnames or []):
-                raise ValueError(f'{path.name}缺少必要字段：{sorted(required - set(reader.fieldnames or []))}')
-            previous_line = 1
-            for row in reader:
-                line = previous_line + 1
-                previous_line = reader.line_num
-                scanned += 1
-                source['scanned_rows'] += 1
-                industry = classify(row['招聘岗位'], row.get('上市公司行业', ''))
-                if not industry:
-                    continue
-                try:
-                    published = date.fromisoformat(row['招聘发布日期'].strip()[:10])
-                    month = published.strftime('%Y-%m')
-                except ValueError:
-                    invalid_dates += 1
-                    continue
-                matched += 1
-                source['matched_rows'] += 1
-                company = row.get('企业名称', '')
-                description = safe_text(row['职位描述'], company)
-                job = {'title': safe_text(row['招聘岗位'], company), 'city': safe_text(row['工作城市']),
-                       'industry': industry, 'month': month,
-                       'salary': salary_interval(row['最低月薪'], row['最高月薪']),
-                       'education': safe_text(row.get('学历要求')), 'experience': safe_text(row.get('要求经验')),
-                       'description': description, 'skills': [name for name, pattern in PATTERNS.items() if pattern.search(description)],
-                       'headcount': None}
-                # 企业与完整日期只参与内部摘要，避免把独立公告误合并；不写入共享正文。
-                fingerprint = hashlib.sha256(encode([company, published.isoformat(), job]).encode()).hexdigest()
-                provenance = {'source_id': source_id, 'file': path.name, 'line': line}
-                if fingerprint in jobs:
-                    duplicates += 1
-                    jobs[fingerprint]['provenance'].append(provenance)
-                else:
-                    jobs[fingerprint] = {'id': fingerprint[:24], **job, 'provenance': [provenance]}
+                  'scanned_rows': 0, 'matched_rows': 0, 'period': '文件内有效发布日期，见月份统计'}
+        for line, row in read_recruitment(path):
+            scanned += 1
+            source['scanned_rows'] += 1
+            industry = classify(row['招聘岗位'], row.get('上市公司行业', ''))
+            if not industry:
+                continue
+            normalized = normalize_recruitment(row)
+            quality.update(normalized['issues'])
+            if not normalized['published']:
+                invalid_dates += 1
+                continue
+            month = normalized['published'][:7]
+            matched += 1
+            source['matched_rows'] += 1
+            company = row.get('企业名称', '')
+            description = safe_text(row['职位描述'], company)
+            job = {'title': safe_text(row['招聘岗位'], company), 'city': safe_text(row['工作城市']),
+                   'industry': industry, 'month': month,
+                   'salary': salary_interval(row['最低月薪'], row['最高月薪']),
+                   'education': safe_text(normalized['education']), 'experience': safe_text(normalized['experience']),
+                   'employment_type': safe_text(normalized['employment_type']),
+                   'recruitment_category': safe_text(normalized['recruitment_category']),
+                   'primary_category': safe_text(normalized['primary_category']),
+                   'published_year': normalized['published_year'], 'ended_year': normalized['ended_year'],
+                   'raw_requirements': {key: safe_text(value, company) for key, value in normalized['raw_requirements'].items()},
+                   'description': description, 'skills': [name for name, pattern in PATTERNS.items() if pattern.search(description)],
+                   'headcount': normalized['headcount'], 'headcount_verified': False}
+            # 企业与完整日期只参与内部摘要；不写入共享正文。
+            fingerprint = recruitment_fingerprint(row, normalized)
+            provenance = {'source_id': source_id, 'file': path.name, 'line': line,
+                          'channel': safe_text(row.get('来源')), 'platform': safe_text(row.get('来源平台'))}
+            if fingerprint in jobs:
+                duplicates += 1
+                jobs[fingerprint]['provenance'].append(provenance)
+            else:
+                jobs[fingerprint] = {'id': fingerprint[:24], **job, 'provenance': [provenance]}
         sources.append(source)
     return {'jobs': sorted(jobs.values(), key=lambda j: (j['month'], j['id']), reverse=True),
             'sources': sources, 'scanned_rows': scanned, 'matched_rows': matched,
-            'duplicate_rows': duplicates, 'invalid_dates': invalid_dates,
-            'method': '岗位标题关键词及金融行业×技术岗位规则筛选；技能为正文关键词命中，不代表等级。同企业、同原始发布日期且脱敏岗位内容相同才合并；企业和日级日期仅参与内部摘要，页面按月份展示并保留全部出处。',
-            'scope': '两份2026年招聘CSV的相关岗位；公告条数不等于招聘人数。不同数据包有覆盖重叠，未推算市场总需求。'}
+            'duplicate_rows': duplicates, 'invalid_dates': invalid_dates, 'quality_issues': dict(quality),
+            'method': '岗位标题及关联上市公司行业×技术岗位筛选；技能为正文词项命中，不代表等级。按企业、完整日期、原始正文、薪资与标准化资格条件去重并保留出处；展示月份。人数仅为公告拟招人数，不是已核实招聘人数。',
+            'scope': '输入CSV中的相关历史岗位；公告条数不等于招聘人数。不同数据包有覆盖重叠，未推算市场总需求。'}
 
 
 def recruitment_stats(jobs):

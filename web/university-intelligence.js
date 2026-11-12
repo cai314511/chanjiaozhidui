@@ -27,6 +27,7 @@ function library(){
   document.head.append(script);
  });return libraryPromise;
 }
+export function universityChartLibrary(){return library();}
 function optionList(values,value,label){const list=[...new Set([...(values||[]),...(value?[value]:[])])];return `<option value="">${label}</option>`+list.map(item=>`<option value="${e(item)}" ${value===item?'selected':''}>${e(item)}</option>`).join('');}
 function valueLabel(value){return value===null||value===undefined?'样本不足':fmt(value);}
 function chartPanel(id,title,subtitle,wide=false){return `<section class="intel-panel ${wide?'intel-wide':''}"><div class="intel-chart-heading"><span class="intel-kicker">${e(id.toUpperCase())}</span><h3>${title}</h3><p>${subtitle}</p></div><div class="intel-chart" data-intel-chart="${id}" role="img" aria-label="${title}"></div></section>`;}

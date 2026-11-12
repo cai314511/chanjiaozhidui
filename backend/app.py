@@ -717,6 +717,8 @@ def create_app(data_root=None, enable_demo=True):
     attach_university_courses(app, store, user)
     from backend.university_intelligence import attach_university_intelligence
     attach_university_intelligence(app, store, user)
+    from backend.university_report import attach_university_report
+    attach_university_report(app, store, user)
     from backend.experience_api import attach_experience
     attach_experience(app, store, user, role, owned, entity, flat, application_access, agent_run, updated_weights)
     from backend.recruiting import attach_recruiting
