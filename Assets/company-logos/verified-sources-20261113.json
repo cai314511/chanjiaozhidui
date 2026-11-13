@@ -1,0 +1,123 @@
+[
+  {
+    "brand": "MINTH GROUP",
+    "asset_name": "minth-group",
+    "company_names": ["Minth Group"],
+    "allowed_asset_hosts": ["www.minthgroup.com"],
+    "source": {
+      "page_url": "https://www.minthgroup.com/ENG/",
+      "asset_url": "https://www.minthgroup.com/ENG/images/logo.png",
+      "relationship_url": "https://www.minthgroup.com/ENG/channels/investors.html",
+      "relationship_note": "官网页头img的alt明确为MINTH GROUP，投资者页明确Minth Group Limited。目录为Minth Group品牌名，精确对应，不扩展敏实旗下具体法人。官网2026年新标识公告与当前页头标识共同核对。"
+    }
+  },
+  {
+    "brand": "BPW",
+    "asset_name": "bpw-meizhou",
+    "company_names": ["BPW（梅州）车轴有限公司"],
+    "allowed_asset_hosts": ["www.bpw.cn"],
+    "source": {
+      "page_url": "https://www.bpw.cn/",
+      "asset_url": "https://www.bpw.cn/tangupfile/ad/20250401140416_53247.jpg",
+      "relationship_url": "https://www.bpw.cn/",
+      "relationship_note": "官网title及关于BPW正文明确BPW(梅州)车轴有限公司，首页#topLogo直接引用该图片；目录全角括号与官网半角括号为同一完整法人名称，不扩展BPW其他法人。"
+    }
+  },
+  {
+    "brand": "SMC",
+    "asset_name": "smc",
+    "company_names": ["SMC(中国)有限公司", "SMC自动化有限公司"],
+    "allowed_asset_hosts": ["www.smc.com.cn"],
+    "source": {
+      "page_url": "https://www.smc.com.cn/zh-cn/",
+      "asset_url": "https://www.smc.com.cn/assets/smc_img/common/smc_logo.png",
+      "relationship_url": "https://www2.smc.com.cn/company/Contact.html",
+      "relationship_note": "SMC中国官网页头完整SMC标识；官网咨询页同时列明SMC (中国)有限公司与SMC 自动化有限公司及共同中国区总部，逐项核对两个目录法人名称，不扩展其他同字企业。"
+    }
+  },
+  {
+    "brand": "TUV SUD",
+    "asset_name": "tuv-sud",
+    "company_names": ["TUV南德意志集团"],
+    "allowed_asset_hosts": ["www.tuvsud.cn"],
+    "source": {
+      "page_url": "https://www.tuvsud.cn/zh-cn",
+      "asset_url": "https://www.tuvsud.cn/android-chrome-192x192.png",
+      "relationship_url": "https://www.tuvsud.cn/zh-cn",
+      "relationship_note": "官网title明确TÜV南德意志大中华集团官网，采用首页link icon直接引用的官方192像素PNG，与页头TÜV SÜD标识一致且保留完整文字；仅用于目录品牌条目TUV南德意志集团，不混用TÜV莱茵或未核对分支法人。页头SVG含现有转换器不支持的filter，保持安全限制并选官网PNG。"
+    }
+  },
+  {
+    "brand": "Goertek",
+    "asset_name": "goertek",
+    "company_names": ["歌尔股份有限公司"],
+    "allowed_asset_hosts": ["www.goertek.com"],
+    "source": {
+      "page_url": "https://www.goertek.com/about/intro.html",
+      "asset_url": "https://www.goertek.com/images/logo-com.png",
+      "relationship_url": "https://www.goertek.com/about/intro.html",
+      "relationship_note": "官网公司简介明确歌尔股份有限公司及其成立、上市信息；图片为该页页头直接引用的深色Goertek完整标识，仅绑定该完整法人，不扩展歌尔集团旗下其他品牌。"
+    }
+  },
+  {
+    "brand": "BOE",
+    "asset_name": "boe",
+    "company_names": ["京东方科技集团股份有限公司"],
+    "allowed_asset_hosts": ["www.boe.com.cn"],
+    "source": {
+      "page_url": "https://www.boe.com.cn/",
+      "asset_url": "https://www.boe.com.cn/nuxt/resouces/img/logo2.7e63e62.png",
+      "relationship_url": "https://www.boe.com.cn/about/index/",
+      "relationship_note": "官网企业介绍将京东方科技集团股份有限公司与BOE明确并列，版权主体同名；图片为官网页头深色BOE完整标识，不扩展不同生产基地或子公司。"
+    }
+  },
+  {
+    "brand": "WEICHAI",
+    "asset_name": "weichai-power",
+    "company_names": ["潍柴动力股份有限公司"],
+    "allowed_asset_hosts": ["www.weichaipower.com"],
+    "source": {
+      "page_url": "https://www.weichaipower.com/",
+      "asset_url": "https://www.weichaipower.com/group/weichai/cn/fileDir/resource/cms/2026/06/img_pc_site/2026060114513767984.png",
+      "relationship_url": "https://m.weichaipower.com/about/profile/",
+      "relationship_note": "潍柴动力官方网站当前页头直接展示该WEICHAI标识，页脚版权为潍柴动力股份有限公司，官方企业概况明确公司全名。仅绑定此法人，不将扬州柴油机等名称匹配条目直接合并。"
+    }
+  },
+  {
+    "brand": "H3C",
+    "asset_name": "h3c",
+    "company_names": ["新华三"],
+    "allowed_asset_hosts": ["resource.h3c.com"],
+    "source": {
+      "page_url": "https://www.h3c.com/cn/",
+      "asset_url": "https://resource.h3c.com/cn/tres/NewWebUI/2020/images/logo.png?v=2603",
+      "relationship_url": "https://www.h3c.com/cn/",
+      "relationship_note": "新华三官网页头直接引用resource.h3c.com官方资源主机的H3C标识，标题及页脚确认新华三品牌。目录为新华三简称，仅绑定此品牌条目。"
+    }
+  },
+  {
+    "brand": "LENS",
+    "asset_name": "lens-technology",
+    "company_names": ["蓝思科技股份有限公司"],
+    "allowed_asset_hosts": ["www.hnlens.com"],
+    "source": {
+      "page_url": "https://www.hnlens.com/",
+      "asset_url": "https://www.hnlens.com/upload/image/2024/07/16/63080ce9-facd-4942-824c-0f76e0f6e21f.png",
+      "relationship_url": "https://www.hnlens.com/category/about.html",
+      "relationship_note": "官网页头标识img alt与版权主体均明确蓝思科技股份有限公司；选首页直接引用的彩色LENS完整标识，仅绑定该法人，不扩展长沙等独立子公司。"
+    }
+  },
+  {
+    "brand": "LUXSHARE-ICT",
+    "asset_name": "luxshare-ict",
+    "company_names": ["立讯精密工业股份有限公司"],
+    "allowed_asset_hosts": ["www.luxshare-ict.com"],
+    "rasterize_svg": true,
+    "source": {
+      "page_url": "https://www.luxshare-ict.com/",
+      "asset_url": "https://www.luxshare-ict.com/Public/Uploads/uploadfile/images/20231018/logo2.svg",
+      "relationship_url": "https://www.luxshare-ict.com/about/company-profile.html",
+      "relationship_note": "官网公司概况明确立讯精密工业股份有限公司，页脚版权主体相同；选首页直接引用的深色版完整LUXSHARE-ICT标识，经既有安全SVG转换器离线栅格化，仅绑定此法人。"
+    }
+  }
+]

@@ -3,7 +3,8 @@ import math
 from graphlib import CycleError, TopologicalSorter
 
 import numpy as np
-from scipy.optimize import Bounds, LinearConstraint, milp
+from scipy.optimize import Bounds, LinearConstraint
+from backend.solver import milp
 from scipy.stats import binomtest, fisher_exact, linregress
 
 

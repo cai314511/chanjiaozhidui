@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException
 from backend.competition_api import public_result
 from backend.decision import changed_skills, structural_score, validate_program
 from backend.store import now
+from backend.job_state import active_job
 
 
 SCENARIOS = [
@@ -22,12 +23,25 @@ def coverage(skills, targets):
                            for name, target in targets.items()) / len(targets), 3)
 
 
-def build_report(store, owner):
+def owned_result(store, owner, ident, kind):
+    item = store.get(ident, kind)
+    if item is None:
+        raise HTTPException(404, '所选测算记录不存在')
+    if item['owner'] != owner:
+        raise HTTPException(403, '仅可读取本校测算记录')
+    return item
+
+
+def build_report(store, owner, run_id=None, optimization_id=None):
+    if run_id is not None and optimization_id is not None:
+        raise HTTPException(422, '请仅选择一次专业决策或培养方案优化')
+    if optimization_id is not None:
+        return optimization_report(store, owner, owned_result(store, owner, optimization_id, 'optimization'))
     profiles = store.list('university_profile', owner)
     program = profiles[0]['data']['program'] if profiles else None
     proposals = profiles[0]['data'].get('actions', []) if profiles else []
     runs = store.list('decision_run', owner)
-    run = runs[0] if runs else None
+    run = owned_result(store, owner, run_id, 'decision_run') if run_id is not None else (runs[0] if runs else None)
     result = run['data']['result'] if run else {}
     case = run['data']['case'] if run else {}
     if case:
@@ -54,7 +68,7 @@ def build_report(store, owner):
         levels = defaultdict(list)
         for item in store.list('job'):
             job = item['data']
-            if job.get('deleted') or job.get('closed') or job.get('status') in {'draft', 'paused', 'closed', 'archived'}:
+            if not active_job(job):
                 continue
             for requirement in job.get('requirements', []):
                 levels[requirement['skill']].append(requirement['target'])
@@ -149,7 +163,8 @@ def build_report(store, owner):
         'courses_before': program['courses'] if program else [],
         'courses_after': adjusted['courses'] if adjusted else [],
         'feasible': adjusted['feasible'] if adjusted else None,
-        'source': {'run_id': run['id'] if run else None, 'title': case.get('title'),
+        'source': {'run_id': run['id'] if run else None, 'optimization_id': None,
+                   'case_id': run['data'].get('case_id') if run else None, 'title': case.get('title'),
                    'created_at': run['created'] if run else None,
                    'assumptions': case.get('assumptions'),
                    'provenance': run['data'].get('provenance', []) if run else []},
@@ -160,9 +175,60 @@ def build_report(store, owner):
     })
 
 
+def optimization_report(store, owner, saved):
+    """仅展示简版真实输入与资源解，不推导缺失的能力基线或课程学时。"""
+    inputs, result = saved['data']['input'], saved['data']['result']
+    selected = [c for c in inputs['courses'] if c['id'] in result['selected']]
+    courses = [{
+        'id': c['id'], 'name': c['name'], 'credits': c['credits'],
+        'hours': None, 'prerequisites': [],
+    } for c in selected]
+    catalogs = store.list('university_course_catalog', owner)
+    catalog = catalogs[0]['data'] if catalogs else {'courses': [], 'sources': []}
+    reason = '简版优化已保存资源组合与剩余缺口；未提供能力基线、完整专业课程及就业和需求情景，四年预测待补充。'
+    resource_labels = [('cost', '调整预算', '元'), ('credits', '新增学分', '学分'),
+                       ('teacher_hours', '师资课时', '课时'), ('lab_hours', '实验室课时', '课时'),
+                       ('study_hours', '学生新增学习时间', '课时'), ('months', '完成期限', '月')]
+    metrics = [
+        {'id': key, 'label': label, 'before': None,
+         'after': result['used']['cost'] if key == 'cost' else None, 'unit': unit,
+         'note': '本轮新增投入；原有教学经费未知。' if key == 'cost' else '简版优化未提供该指标所需基线。'}
+        for key, label, unit in [('match', '专业与岗位匹配度', '%'), ('coverage', '学生技能覆盖程度', '%'),
+                                 ('related', '毕业生专业对口率', '%'), ('enrollment', '招生规模适配度', '人'),
+                                 ('cost', '培养方案实施成本', '元')]
+    ]
+    return public_result({
+        'generated_at': now(), 'program': None, 'metrics': metrics, 'student_skills': [],
+        'skills': [{'name': name, 'target': None, 'before': None, 'after': None, 'count': None,
+                    'gap_before': gap, 'gap_after': result['remaining'][name]}
+                   for name, gap in inputs['gaps'].items()],
+        'scenarios': [{'name': name, 'emoji': emoji, 'description': description, 'assumptions': None,
+                       'years': [], 'skill_levels': {}, 'coverage_after': None, 'match_after': None}
+                      for name, emoji, description in SCENARIOS],
+        'forecast_status': 'incomplete', 'forecast_reason': reason, 'forecast_basis': None,
+        'implementation_lag': None, 'admissions_delay_years': None,
+        'metrics_scope': '已保存培养方案优化的输入与结果快照', 'sample_count': None,
+        'actions': [{'action_id': c['id'], 'kind': 'add', 'reason': '在本轮资源上限内选中的培养候选',
+                     'removed': [], 'added': [course], 'evidence': result.get('assumption', '录入的情景假设'),
+                     'cost': c['cost'], 'skill_delta': c['gains'], 'status': '已通过简版资源约束测算'}
+                    for c, course in zip(selected, courses)],
+        'resources': [{'id': key, 'label': label, 'unit': unit, 'before': None,
+                       'after': max((c['months'] for c in selected), default=0) if key == 'months' else result['used'][key],
+                       'limit': inputs['limits'][key]} for key, label, unit in resource_labels],
+        'courses_before': [], 'courses_after': courses, 'feasible': bool(selected),
+        'source': {'run_id': None, 'optimization_id': saved['id'], 'case_id': None,
+                   'title': '培养方案优化 · ' + '、'.join(c['name'] for c in selected) if selected else '培养方案优化 · 无正收益组合',
+                   'created_at': saved['created'], 'assumptions': result.get('assumption'),
+                   'input': inputs, 'provenance': []},
+        'catalog': {'total': len(catalog['courses']), 'sources': catalog['sources'],
+                    'mapped': sum(bool(c.get('skills')) for c in catalog['courses']),
+                    'missing_hours': sum(c.get('hours') is None for c in catalog['courses']), 'departments': []},
+    })
+
+
 def attach_university_report(app, store, user):
     @app.get('/api/university/report')
-    def report(current=Depends(user)):
+    def report(run_id: str | None = None, optimization_id: str | None = None, current=Depends(user)):
         if current['role'] != 'university':
             raise HTTPException(403, '仅高校账号可读取本校培养诊断报告')
-        return build_report(store, current['id'])
+        return build_report(store, current['id'], run_id, optimization_id)

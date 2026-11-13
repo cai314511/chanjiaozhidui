@@ -52,6 +52,23 @@ async function localSpeak(text,session){
 function paint(session){
  const list=document.querySelector('#voice-messages');if(!list)return;
  list.innerHTML=session.data.messages.map(m=>`<div class="message ${m.role==='user'?'user':''}"><small>${m.role==='user'?'你的回答':session.data.mode==='human'?'会话记录':'面试官'}</small>${e(m.text)}</div>`).join('');list.scrollTop=list.scrollHeight;
+ if(session.data.mode==='preset'&&session.data.completed&&state.user.role==='student'&&!document.querySelector('#preset-review')){
+  const answers=session.data.messages.filter(m=>m.role==='user');
+  const panel=document.createElement('form');panel.id='preset-review';
+  panel.innerHTML=`<h3>核对回答并提交企业复核</h3><p class="hint">请逐题核对。提交后将替换本岗位测评回答，原回答与复核保留历史，本次需要企业重新复核。</p>${session.data.questions.map((q,index)=>`<label class="field">${e(q.title)}<textarea data-question="${e(q.id)}" required maxlength="15000">${e(answers.find(m=>m.question_id===q.id)?.text||answers[index]?.text||'')}</textarea></label>`).join('')}<label class="check"><input type="checkbox" required id="preset-confirm"><span>我已核对，确认将这些回答提交给当前岗位企业复核</span></label><button class="btn primary" type="submit">确认提交企业复核</button><p class="hint" id="preset-submit-status" role="status"></p>`;
+  list.after(panel);
+  panel.onsubmit=async event=>{
+   event.preventDefault();if(session.submitting||!panel.reportValidity())return;
+   session.submitting=true;const btn=panel.querySelector('[type=submit]');btn.disabled=true;
+   try{
+    if(!session.data.job_version)throw new Error('此历史会话缺少岗位版本，请重新开始预设面试');
+    const values=Object.fromEntries([...panel.querySelectorAll('[data-question]')].map(input=>[input.dataset.question,input.value.trim()]));
+    await post('/applications/'+session.data.application_id+'/answers',{job_version:session.data.job_version,answers:values});
+    if(!valid(session))return;
+    document.querySelector('#preset-submit-status').textContent='已提交企业复核';document.querySelector('#voice-error').textContent='';await refresh();
+   }catch(err){if(valid(session))showError(err)}finally{session.submitting=false;if(btn.isConnected)btn.disabled=false;}
+  };
+ }
 }
 async function openSession(data){
  stopVoice();active={data,epoch:state.sessionEpoch};const session=active;
@@ -127,12 +144,15 @@ on('start-interview',async el=>{const data=await post('/interviews',{mode:el.dat
 on('join-interview',async el=>openSession(await api('/interviews/'+el.dataset.id)));
 
 async function sendSignal(session,kind,payload){
- for(let attempt=0;attempt<3;attempt++){
-  if(!valid(session))return;
-  const latest=await api('/interviews/'+session.data.id);
-  try{return await post('/interviews/'+session.data.id+'/signal',{revision:latest.revision,call_id:session.callId,kind,payload});}
-  catch(err){if(!err.message.includes('已更新')||attempt===2)throw err;}
- }
+ const callId=session.callId;
+ const send=async()=>{
+  if(!valid(session)||session.callId!==callId)throw new DOMException('通话已关闭','AbortError');
+  const result=await post('/interviews/'+session.data.id+'/signal',{revision:session.data.revision,call_id:callId,kind,payload});
+  if(valid(session)&&session.callId===callId)session.data=result;
+  return result;
+ };
+ const pending=(session.signalQueue||Promise.resolve()).then(send);
+ session.signalQueue=pending.catch(()=>{});return pending;
 }
 async function connectHuman(session){
  if(peer||session.connecting)return;
@@ -142,12 +162,13 @@ async function connectHuman(session){
  callStream=acquired;
  peer=new RTCPeerConnection({iceServers:[]});callStream.getTracks().forEach(track=>peer.addTrack(track,callStream));
  const pc=peer,pending=[];signalCursor=0;
- const localCandidates=[];let offerSent=false;
- pc.onicecandidate=event=>{if(!event.candidate)return;if(session.data.owner===state.user.id&&!offerSent)localCandidates.push(event.candidate.toJSON());else sendSignal(session,'candidate',event.candidate.toJSON()).catch(showError);};
+ const localCandidates=[];let descriptionSent=false;
+ const publishCandidates=async()=>{descriptionSent=true;for(const candidate of localCandidates.splice(0))await sendSignal(session,'candidate',candidate);};
+ pc.onicecandidate=event=>{if(!event.candidate||!valid(session)||peer!==pc)return;if(!descriptionSent)localCandidates.push(event.candidate.toJSON());else sendSignal(session,'candidate',event.candidate.toJSON()).catch(showError);};
  pc.ontrack=event=>{const audio=document.querySelector('#remote-audio');audio.hidden=false;audio.srcObject=event.streams[0];audio.play().catch(showError);};
- pc.onconnectionstatechange=()=>{if(valid(session))setStatus(pc.connectionState==='connected'?'speaking':'idle',pc.connectionState==='connected'?'真人音频已接通':pc.connectionState==='failed'?'音频连接失败，请检查网络和浏览器权限':'正在连接企业面试官');};
+ pc.onconnectionstatechange=()=>{if(valid(session)){if(pc.connectionState==='connected')document.querySelector('#voice-error').textContent='';setStatus(pc.connectionState==='connected'?'speaking':'idle',pc.connectionState==='connected'?'真人音频已接通':pc.connectionState==='failed'?'音频连接失败，请检查网络和浏览器权限':'正在连接企业面试官');}};
  const caller=session.data.owner===state.user.id;
- if(caller){session.callId=crypto.randomUUID();const offer=await pc.createOffer();await pc.setLocalDescription(offer);await sendSignal(session,'offer',pc.localDescription.toJSON());offerSent=true;for(const candidate of localCandidates)await sendSignal(session,'candidate',candidate);}
+ if(caller){session.data=await api('/interviews/'+session.data.id);session.callId=crypto.randomUUID();const offer=await pc.createOffer();await pc.setLocalDescription(offer);await sendSignal(session,'offer',pc.localDescription.toJSON());await publishCandidates();}
  const poll=async()=>{
   if(!valid(session)||pc.signalingState==='closed')return;
   try{const latest=await api('/interviews/'+session.data.id);session.data=latest;
@@ -156,7 +177,7 @@ async function connectHuman(session){
    for(const signal of latest.signals.slice(signalCursor)){
     if(signal.actor===state.user.id||signal.call_id!==session.callId)continue;
     if(signal.kind==='leave'){setStatus('idle','对方面试官已离开');pc.close();return;}
-    if(signal.kind==='offer'&&!caller){await pc.setRemoteDescription(signal.payload);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await sendSignal(session,'answer',pc.localDescription.toJSON());}
+    if(signal.kind==='offer'&&!caller){await pc.setRemoteDescription(signal.payload);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await sendSignal(session,'answer',pc.localDescription.toJSON());await publishCandidates();}
     else if(signal.kind==='answer'&&caller&&pc.signalingState==='have-local-offer')await pc.setRemoteDescription(signal.payload);
     else if(signal.kind==='candidate')pending.push(signal.payload);
    }

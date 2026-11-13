@@ -17,6 +17,7 @@ from pypdf.errors import PdfReadError
 from backend import schemas as s
 from backend.documents import MAX_SIZE, extract
 from backend.matching import allocate, match, normalized, optimize_courses
+from backend.job_state import active_job
 from backend.store import Store, check_password, encode, now, password_hash, uid
 from backend.presentation import public_product, parameter_question, PARAMETER_REPLY
 
@@ -474,11 +475,11 @@ def create_app(data_root=None, enable_demo=True):
     @app.post("/api/employer/allocate")
     def allocation(payload: s.Budget, current=Depends(user)):
         role(current, ["employer"])
-        job_map = {j["id"]: flat(j) for j in store.list("job", current["id"])}
+        job_map = {j["id"]: flat(j) for j in store.list("job", current["id"]) if active_job(j['data'])}
         pairs = []
         for item in store.list("application"):
             job_id = item["data"]["job_id"]
-            if job_id in job_map and not item["data"].get("withdrawn"):
+            if job_id in job_map and not item["data"].get("withdrawn") and item['data'].get('stage') != 'declined':
                 result = application_result(item, entity(job_id, "job"))
                 pairs.append({"application_id": item["id"], "job_id": job_id, "student_id": item["owner"], "status": result["match"]["status"], "lower": result["match"]["lower"], "mutual": item["data"].get("student_chosen") and item["data"].get("employer_chosen")})
         return allocate(pairs, job_map, payload.model_dump())
@@ -551,6 +552,8 @@ def create_app(data_root=None, enable_demo=True):
             return {"suppressed": True, "minimum": 5, "message": "本校授权样本不足5人，暂不展示能力统计"}
         needs, supplies = {}, {}
         for job in store.list("job"):
+            if not active_job(job['data']):
+                continue
             for req in job["data"]["requirements"]:
                 needs.setdefault(req["skill"], []).append(req["target"])
         for p in profiles:

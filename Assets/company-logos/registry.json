@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-06T16:51:21.613193+00:00",
+  "updated_at": "2026-11-13T07:20:21.077442+00:00",
   "companies": {
     "a756f7da297c5cae3ea41bae": {
       "id": "a756f7da297c5cae3ea41bae",
@@ -223,11 +223,23 @@
     "4e56ffc2cbbcdbd5f9f8d426": {
       "id": "4e56ffc2cbbcdbd5f9f8d426",
       "name": "BPW（梅州）车轴有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "BPW",
+      "asset": "bpw-meizhou-385e1ca8e6ca.png",
+      "source": {
+        "page_url": "https://www.bpw.cn/",
+        "asset_url": "https://www.bpw.cn/tangupfile/ad/20250401140416_53247.jpg",
+        "relationship_url": "https://www.bpw.cn/",
+        "relationship_note": "官网title及关于BPW正文明确BPW(梅州)车轴有限公司，首页#topLogo直接引用该图片；目录全角括号与官网半角括号为同一完整法人名称，不扩展BPW其他法人。",
+        "verified_at": "2026-11-13T07:20:10.123466+00:00",
+        "download_sha256": "297c26582a8c98b6c0cbb5384822bb198d272a940b279a5377c96a35de73e5c7",
+        "asset_sha256": "385e1ca8e6ca8f9f60afcce22cff5eeae2520a41f747735eacc576f448adad3a",
+        "width": 327,
+        "height": 87
+      },
+      "status": "verified",
+      "aliases": [
+        "BPW（梅州）车轴有限公司"
+      ]
     },
     "81a9116d3676f347b2e8c2a1": {
       "id": "81a9116d3676f347b2e8c2a1",
@@ -336,11 +348,23 @@
     "e2b04b94f81306605f3c7295": {
       "id": "e2b04b94f81306605f3c7295",
       "name": "Minth Group",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "MINTH GROUP",
+      "asset": "minth-group-2e9dd0362bd3.png",
+      "source": {
+        "page_url": "https://www.minthgroup.com/ENG/",
+        "asset_url": "https://www.minthgroup.com/ENG/images/logo.png",
+        "relationship_url": "https://www.minthgroup.com/ENG/channels/investors.html",
+        "relationship_note": "官网页头img的alt明确为MINTH GROUP，投资者页明确Minth Group Limited。目录为Minth Group品牌名，精确对应，不扩展敏实旗下具体法人。官网2026年新标识公告与当前页头标识共同核对。",
+        "verified_at": "2026-11-13T07:20:08.376308+00:00",
+        "download_sha256": "c4167c3b1148eb310af9a2893f6e7ae66a67666cb6f3e4a0a7eebe6ec5177f30",
+        "asset_sha256": "2e9dd0362bd3ce38686fdd772107b6e5e6cdfadc5b87737840fdeb9661979595",
+        "width": 424,
+        "height": 116
+      },
+      "status": "verified",
+      "aliases": [
+        "Minth Group"
+      ]
     },
     "1f39eb8f0f238eb6b1ae4338": {
       "id": "1f39eb8f0f238eb6b1ae4338",
@@ -417,20 +441,46 @@
     "6a42573d25cfac973701646b": {
       "id": "6a42573d25cfac973701646b",
       "name": "SMC(中国)有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "SMC",
+      "asset": "smc-e73de5c83a70.png",
+      "source": {
+        "page_url": "https://www.smc.com.cn/zh-cn/",
+        "asset_url": "https://www.smc.com.cn/assets/smc_img/common/smc_logo.png",
+        "relationship_url": "https://www2.smc.com.cn/company/Contact.html",
+        "relationship_note": "SMC中国官网页头完整SMC标识；官网咨询页同时列明SMC (中国)有限公司与SMC 自动化有限公司及共同中国区总部，逐项核对两个目录法人名称，不扩展其他同字企业。",
+        "verified_at": "2026-11-13T07:20:11.155305+00:00",
+        "download_sha256": "f1546a94c9b721c678700170ddcb76df8cdb2eeeca1005d1753ca35568c54f08",
+        "asset_sha256": "e73de5c83a7020b7aa476514c1015c3b288185339ff2b3e12ab2825e1a681c8b",
+        "width": 236,
+        "height": 84
+      },
+      "status": "verified",
+      "aliases": [
+        "SMC(中国)有限公司",
+        "SMC自动化有限公司"
+      ]
     },
     "093e7dff498e71399c30a2ab": {
       "id": "093e7dff498e71399c30a2ab",
       "name": "SMC自动化有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "SMC",
+      "asset": "smc-e73de5c83a70.png",
+      "source": {
+        "page_url": "https://www.smc.com.cn/zh-cn/",
+        "asset_url": "https://www.smc.com.cn/assets/smc_img/common/smc_logo.png",
+        "relationship_url": "https://www2.smc.com.cn/company/Contact.html",
+        "relationship_note": "SMC中国官网页头完整SMC标识；官网咨询页同时列明SMC (中国)有限公司与SMC 自动化有限公司及共同中国区总部，逐项核对两个目录法人名称，不扩展其他同字企业。",
+        "verified_at": "2026-11-13T07:20:11.155305+00:00",
+        "download_sha256": "f1546a94c9b721c678700170ddcb76df8cdb2eeeca1005d1753ca35568c54f08",
+        "asset_sha256": "e73de5c83a7020b7aa476514c1015c3b288185339ff2b3e12ab2825e1a681c8b",
+        "width": 236,
+        "height": 84
+      },
+      "status": "verified",
+      "aliases": [
+        "SMC(中国)有限公司",
+        "SMC自动化有限公司"
+      ]
     },
     "1a296e02dac956f0621f11cb": {
       "id": "1a296e02dac956f0621f11cb",
@@ -575,11 +625,23 @@
     "cac83a179aa2ba903a0ac703": {
       "id": "cac83a179aa2ba903a0ac703",
       "name": "TUV南德意志集团",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "TUV SUD",
+      "asset": "tuv-sud-9dce915f0a5a.png",
+      "source": {
+        "page_url": "https://www.tuvsud.cn/zh-cn",
+        "asset_url": "https://www.tuvsud.cn/android-chrome-192x192.png",
+        "relationship_url": "https://www.tuvsud.cn/zh-cn",
+        "relationship_note": "官网title明确TÜV南德意志大中华集团官网，采用首页link icon直接引用的官方192像素PNG，与页头TÜV SÜD标识一致且保留完整文字；仅用于目录品牌条目TUV南德意志集团，不混用TÜV莱茵或未核对分支法人。页头SVG含现有转换器不支持的filter，保持安全限制并选官网PNG。",
+        "verified_at": "2026-11-13T07:20:12.014497+00:00",
+        "download_sha256": "f38f9772ec38c1b45856b4f31041668856837c410e073ee34dc4da5958cde045",
+        "asset_sha256": "9dce915f0a5af6959d21d853c619ff864168eb77252b18e8a7e0dee34e276bc6",
+        "width": 192,
+        "height": 192
+      },
+      "status": "verified",
+      "aliases": [
+        "TUV南德意志集团"
+      ]
     },
     "1a637788c9e469bd4e4ef4bf": {
       "id": "1a637788c9e469bd4e4ef4bf",
@@ -44971,11 +45033,23 @@
     "5de808e6054b5364e90ffb20": {
       "id": "5de808e6054b5364e90ffb20",
       "name": "京东方科技集团股份有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "BOE",
+      "asset": "boe-376ec5d50fa0.png",
+      "source": {
+        "page_url": "https://www.boe.com.cn/",
+        "asset_url": "https://www.boe.com.cn/nuxt/resouces/img/logo2.7e63e62.png",
+        "relationship_url": "https://www.boe.com.cn/about/index/",
+        "relationship_note": "官网企业介绍将京东方科技集团股份有限公司与BOE明确并列，版权主体同名；图片为官网页头深色BOE完整标识，不扩展不同生产基地或子公司。",
+        "verified_at": "2026-11-13T07:20:13.896036+00:00",
+        "download_sha256": "daa0fe9a111a54afe851b9e99a86972140f868f5e0496a0e9a58ebcb278bb5b5",
+        "asset_sha256": "376ec5d50fa09865cd9008998cbf264f8474accdf10727bbff9ba9742ef0b2d4",
+        "width": 82,
+        "height": 78
+      },
+      "status": "verified",
+      "aliases": [
+        "京东方科技集团股份有限公司"
+      ]
     },
     "6e44d94ee1ed3f3a33d47ebd": {
       "id": "6e44d94ee1ed3f3a33d47ebd",
@@ -131702,11 +131776,23 @@
     "af2b976b3a159370bbca53cc": {
       "id": "af2b976b3a159370bbca53cc",
       "name": "新华三",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "H3C",
+      "asset": "h3c-752730ee1e16.png",
+      "source": {
+        "page_url": "https://www.h3c.com/cn/",
+        "asset_url": "https://resource.h3c.com/cn/tres/NewWebUI/2020/images/logo.png?v=2603",
+        "relationship_url": "https://www.h3c.com/cn/",
+        "relationship_note": "新华三官网页头直接引用resource.h3c.com官方资源主机的H3C标识，标题及页脚确认新华三品牌。目录为新华三简称，仅绑定此品牌条目。",
+        "verified_at": "2026-11-13T07:20:16.182031+00:00",
+        "download_sha256": "0992534e16bd824a2877707a6e01f12c17eb2b2d353dba773479b99d94ce64ff",
+        "asset_sha256": "752730ee1e16c1b16016df0e28a2dd2b21a26b0ebf0e27a09f71901294fc1bdd",
+        "width": 363,
+        "height": 225
+      },
+      "status": "verified",
+      "aliases": [
+        "新华三"
+      ]
     },
     "3c9a761ac815ace165984103": {
       "id": "3c9a761ac815ace165984103",
@@ -145427,11 +145513,23 @@
     "8c7adf5a26e2dc5f99fc7e63": {
       "id": "8c7adf5a26e2dc5f99fc7e63",
       "name": "歌尔股份有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "Goertek",
+      "asset": "goertek-11cd37b8679d.png",
+      "source": {
+        "page_url": "https://www.goertek.com/about/intro.html",
+        "asset_url": "https://www.goertek.com/images/logo-com.png",
+        "relationship_url": "https://www.goertek.com/about/intro.html",
+        "relationship_note": "官网公司简介明确歌尔股份有限公司及其成立、上市信息；图片为该页页头直接引用的深色Goertek完整标识，仅绑定该完整法人，不扩展歌尔集团旗下其他品牌。",
+        "verified_at": "2026-11-13T07:20:13.032302+00:00",
+        "download_sha256": "c0a40adfae2fc99621fc288553cd5bf3a91569964caf3562035866a1064b2db1",
+        "asset_sha256": "11cd37b8679d2391fc562a43c3ddb19e089b6f0fa6fd1040abf4f7cbe8073d49",
+        "width": 160,
+        "height": 35
+      },
+      "status": "verified",
+      "aliases": [
+        "歌尔股份有限公司"
+      ]
     },
     "ea6b404af794761fa853c353": {
       "id": "ea6b404af794761fa853c353",
@@ -199691,11 +199789,23 @@
     "c8a8acbc9e3c6abbf3be3e90": {
       "id": "c8a8acbc9e3c6abbf3be3e90",
       "name": "潍柴动力股份有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "WEICHAI",
+      "asset": "weichai-power-2c7da27b1b65.png",
+      "source": {
+        "page_url": "https://www.weichaipower.com/",
+        "asset_url": "https://www.weichaipower.com/group/weichai/cn/fileDir/resource/cms/2026/06/img_pc_site/2026060114513767984.png",
+        "relationship_url": "https://m.weichaipower.com/about/profile/",
+        "relationship_note": "潍柴动力官方网站当前页头直接展示该WEICHAI标识，页脚版权为潍柴动力股份有限公司，官方企业概况明确公司全名。仅绑定此法人，不将扬州柴油机等名称匹配条目直接合并。",
+        "verified_at": "2026-11-13T07:20:14.981589+00:00",
+        "download_sha256": "b86622fbe8224e7bc353538e27173d6d815f10686de5b6cc11e92dd9220b76b3",
+        "asset_sha256": "2c7da27b1b65c17d7ea5d9094d8da247521db1ee6497047f41d762a9991ad42f",
+        "width": 360,
+        "height": 120
+      },
+      "status": "verified",
+      "aliases": [
+        "潍柴动力股份有限公司"
+      ]
     },
     "c24daf15d226f0a2d6811646": {
       "id": "c24daf15d226f0a2d6811646",
@@ -210460,11 +210570,25 @@
     "e7aba374f6114f837688d792": {
       "id": "e7aba374f6114f837688d792",
       "name": "立讯精密工业股份有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "LUXSHARE-ICT",
+      "asset": "luxshare-ict-72d9a68bafb1.png",
+      "source": {
+        "page_url": "https://www.luxshare-ict.com/",
+        "asset_url": "https://www.luxshare-ict.com/Public/Uploads/uploadfile/images/20231018/logo2.svg",
+        "relationship_url": "https://www.luxshare-ict.com/about/company-profile.html",
+        "relationship_note": "官网公司概况明确立讯精密工业股份有限公司，页脚版权主体相同；选首页直接引用的深色版完整LUXSHARE-ICT标识，经既有安全SVG转换器离线栅格化，仅绑定此法人。",
+        "original_download_sha256": "2692c783009cbe9c1148f928c1e68021dd85d0a93e8f5a9e33c31fef13edba7d",
+        "processing": "官方静态SVG经禁脚本、禁网络浏览器等比栅格化；本地仅提供PNG",
+        "verified_at": "2026-11-13T07:20:20.828159+00:00",
+        "download_sha256": "02584b33739308c6d3a4b229edbf4976d03007aec5dcd188b6b7c977214968ba",
+        "asset_sha256": "72d9a68bafb1c079f177f3b9c681487c95fbe7966552ef3da15f3ef0292ef5d6",
+        "width": 200,
+        "height": 56
+      },
+      "status": "verified",
+      "aliases": [
+        "立讯精密工业股份有限公司"
+      ]
     },
     "1117c46c047d8c8daae8eaf8": {
       "id": "1117c46c047d8c8daae8eaf8",
@@ -224692,11 +224816,23 @@
     "c7a55349c7a29ca0e68c6056": {
       "id": "c7a55349c7a29ca0e68c6056",
       "name": "蓝思科技股份有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "LENS",
+      "asset": "lens-technology-97615bddbe06.png",
+      "source": {
+        "page_url": "https://www.hnlens.com/",
+        "asset_url": "https://www.hnlens.com/upload/image/2024/07/16/63080ce9-facd-4942-824c-0f76e0f6e21f.png",
+        "relationship_url": "https://www.hnlens.com/category/about.html",
+        "relationship_note": "官网页头标识img alt与版权主体均明确蓝思科技股份有限公司；选首页直接引用的彩色LENS完整标识，仅绑定该法人，不扩展长沙等独立子公司。",
+        "verified_at": "2026-11-13T07:20:17.560564+00:00",
+        "download_sha256": "75739ef5651ffdf10216acb32865103f9f4cfaf2242ebd271d2cf0fe9853a129",
+        "asset_sha256": "97615bddbe062714e02033e6739ccf228145fea1ceaf56117d6f30a96b4603c3",
+        "width": 260,
+        "height": 44
+      },
+      "status": "verified",
+      "aliases": [
+        "蓝思科技股份有限公司"
+      ]
     },
     "0beac2da78db3626c38f5cbb": {
       "id": "0beac2da78db3626c38f5cbb",
@@ -245372,7 +245508,6 @@
     "7e113d7fdea62269908dbf10",
     "33b67f834aac6c6fd428778d",
     "9351d9b897e089562ea287d5",
-    "4e56ffc2cbbcdbd5f9f8d426",
     "81a9116d3676f347b2e8c2a1",
     "895e707c8f4cf3858fc8d33b",
     "a8dac3e5c2f8e90f4b5e2a13",
@@ -245382,7 +245517,6 @@
     "15fd23a08112be6dbc438b3a",
     "e2227e0c2a6ecf8002380404",
     "a949f7c1b3e788c2c70384db",
-    "e2b04b94f81306605f3c7295",
     "1f39eb8f0f238eb6b1ae4338",
     "c94be5d9d25c8e3ec9e0de0a",
     "aa7bf3b7c8cfbb716592f47e",
@@ -245391,8 +245525,6 @@
     "ccc00ff027df18221d326322",
     "84741535d856cac5bb670cf1",
     "6770fc819b7520488820c9a6",
-    "6a42573d25cfac973701646b",
-    "093e7dff498e71399c30a2ab",
     "1a296e02dac956f0621f11cb",
     "77adde54e0909a693c3a40e3",
     "14d81100f8f69e7762059f72",
@@ -245406,7 +245538,6 @@
     "9a6f539c0673290c13e503c2",
     "e9ca13d29ee71620c33a8f90",
     "73baf838855e945b22151723",
-    "cac83a179aa2ba903a0ac703",
     "1a637788c9e469bd4e4ef4bf",
     "eaa1bcccb6c1273248709f98",
     "ba190f56df3df28248174111",
@@ -250334,7 +250465,6 @@
     "d4a2f0c6ec9c877111fcc3cb",
     "e6ebbe74a741740593122953",
     "15b67713feabcc632d8aa651",
-    "5de808e6054b5364e90ffb20",
     "6e44d94ee1ed3f3a33d47ebd",
     "a236d6f921ddf3002e8eb7a4",
     "5a37cfeeb03395a439737ef6",
@@ -259961,7 +260091,6 @@
     "660da8d47f9f3fc0a46fe1b2",
     "1ca2147990da0673ae04e061",
     "4b30c353ffffd912a780dcf4",
-    "af2b976b3a159370bbca53cc",
     "3c9a761ac815ace165984103",
     "e188acef300fc0b98a944710",
     "b65889f02994995cd60bade0",
@@ -261486,7 +261615,6 @@
     "fad4b1af39545605942d55e3",
     "a4e95fbd29fde392fbff2778",
     "83368a2b9a5108e6a7263ef5",
-    "8c7adf5a26e2dc5f99fc7e63",
     "ea6b404af794761fa853c353",
     "2f8061b80c847629cb547597",
     "6f660f3bb4b3556b7c9dbb42",
@@ -267513,7 +267641,6 @@
     "f729ad3ca7a85074f217a5c5",
     "c0a6eb8e35fae35361db5397",
     "b7ebefb8dc8e452dc9b50706",
-    "c8a8acbc9e3c6abbf3be3e90",
     "c24daf15d226f0a2d6811646",
     "339f522465f3712e17e01569",
     "13d9316ca4c8f001c93ca69b",
@@ -268707,7 +268834,6 @@
     "42825b17f914d43fa5a23323",
     "f13b9b6031ca3b1287ef0750",
     "97820545f460274f0d0a77f9",
-    "e7aba374f6114f837688d792",
     "1117c46c047d8c8daae8eaf8",
     "73b4dcfc5cf18b454f662b6b",
     "71d094d855ddd03b622e0402",
@@ -270286,7 +270412,6 @@
     "4ca31adc1e345c4ba09dfc1b",
     "53a991193bac9fa759973d0d",
     "981090b355184106742260ea",
-    "c7a55349c7a29ca0e68c6056",
     "0beac2da78db3626c38f5cbb",
     "70c682f0d0caaa04f129ce03",
     "063bf953eca6e795b4da9688",

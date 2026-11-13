@@ -1,8 +1,10 @@
 import {state,e,fmt,money,api as serverApi,post as serverPost,on,button,field,heading,empty,num,values,toast,dialog} from './core.js';
+import {selectUniversityReport} from './university-report.js';
 
 function servicePath(path){return state.user.role==='student'?path.replace('/university/','/student/'):path;}
 const api=path=>serverApi(servicePath(path));
 const post=(path,data)=>serverPost(servicePath(path),data);
+function reportButton(id){return state.user.role==='university'&&id?`<button type="button" class="btn primary" data-action="university-selected-report" data-kind="optimization_id" data-id="${e(id)}">查看本轮图文报告</button>`:'';}
 
 function gapRow(skill='',gap='',weight=1){return `<tr class="gap-row"><td><input name="gap-skill" value="${e(skill)}" required aria-label="技能名称"></td><td><input name="gap-value" type="number" min="0" max="5" step="0.1" value="${gap}" required aria-label="能力缺口"></td><td><input name="gap-weight" type="number" min="0" step="0.1" value="${weight}" required aria-label="缺口优先权重"></td><td>${button('移除','remove-row','','small')}</td></tr>`;}
 function readGaps(){const gaps={},weights={};document.querySelectorAll('.gap-row').forEach(row=>{const skill=row.querySelector('[name=gap-skill]').value.trim();if(!skill)throw new Error('请先填写技能名称');if(skill in gaps)throw new Error('技能名称不能重复');gaps[skill]=num(row.querySelector('[name=gap-value]').value);weights[skill]=num(row.querySelector('[name=gap-weight]').value);});return {gaps,weights};}
@@ -35,14 +37,14 @@ export async function bindCurriculum(){
     }
     card.querySelectorAll('[data-gain]').forEach(input=>input.value=course.gains[input.dataset.gain]);
    }
-   document.querySelector('#curriculum-result').innerHTML=resultHtml(plans[0].result,saved.courses);
+   document.querySelector('#curriculum-result').innerHTML=resultHtml(plans[0].result,saved.courses)+reportButton(plans[0].id);
   }
  }
  form.addEventListener('submit',async event=>{
   event.preventDefault();
   try{const {gaps,weights}=readGaps(),d=values(form);const limits=Object.fromEntries(['cost','credits','teacher_hours','lab_hours','study_hours','months'].map(k=>[k,num(d['limit-'+k])]));
    const courses=[...form.querySelectorAll('.course-card')].map(card=>{const c={id:card.dataset.courseId,name:card.querySelector('[name=course-name]').value,gains:{}};for(const k of ['cost','credits','teacher_hours','lab_hours','study_hours','months'])c[k]=num(card.querySelector('[name=course-'+k+']').value);for(const el of card.querySelectorAll('[data-gain]'))c.gains[el.dataset.gain]=num(el.value);if(Object.keys(c.gains).sort().join('|')!==Object.keys(gaps).sort().join('|'))throw new Error('技能列表已改变，请重新建立候选方案');return c;});
-   if(!courses.length)throw new Error('请添加至少一个候选方案');const result=await post('/university/optimize',{gaps,weights,courses,limits});document.querySelector('#curriculum-result').innerHTML=resultHtml(result,courses);toast('方案计算完成，输入与结果已保存');
+   if(!courses.length)throw new Error('请添加至少一个候选方案');const result=await post('/university/optimize',{gaps,weights,courses,limits});if(state.user.role==='university')selectUniversityReport('optimization_id',result.id);document.querySelector('#curriculum-result').innerHTML=resultHtml(result,courses)+reportButton(result.id);toast('方案计算完成，输入与结果已保存');
   }catch(err){toast(err.message);}
  });
 }
@@ -51,4 +53,4 @@ on('add-gap',()=>document.querySelector('#gap-rows').insertAdjacentHTML('beforee
 on('add-course',()=>{const {gaps}=readGaps();if(!Object.keys(gaps).length)throw new Error('请先录入能力缺口');document.querySelector('#course-cards').insertAdjacentHTML('beforeend',courseCard(Object.keys(gaps)));if(state.user.role==='student'){const card=document.querySelector('.course-card:last-child');for(const key of ['credits','teacher_hours','lab_hours']){const input=card.querySelector('[name="course-'+key+'"]');input.value=0;input.closest('.field').hidden=true;}}});
 on('remove-course',el=>el.closest('.course-card').remove());
 on('use-insights',async()=>{const data=await api('/university/insights');if(data.suppressed||!data.skills?.length){toast('当前没有满足聚合条件的技能数据，请录入已审核的培养缺口');return;}if(document.querySelectorAll('.course-card').length){toast('请先移除已有候选方案，再更新技能列表');return;}document.querySelector('#gap-rows').innerHTML=data.skills.map(s=>gapRow(s.skill,s.gap,1)).join('');});
-on('plan-detail',async el=>{const plans=await api('/university/plans');const plan=plans.find(p=>p.id===el.dataset.id);dialog('培养方案测算记录',resultHtml(plan.result,plan.input.courses)+`<h3>原始资源上限</h3>${Object.entries(plan.input.limits).map(([k,v])=>`<p class="hint">${e({cost:'预算',credits:'学分',teacher_hours:'师资课时',lab_hours:'实验室课时',study_hours:'学习课时',months:'期限（月）'}[k])}：${fmt(v)}</p>`).join('')}`);});
+on('plan-detail',async el=>{const plans=await api('/university/plans');const plan=plans.find(p=>p.id===el.dataset.id);if(state.user.role==='university')selectUniversityReport('optimization_id',plan.id);dialog('培养方案测算记录',reportButton(plan.id)+resultHtml(plan.result,plan.input.courses)+`<h3>原始资源上限</h3>${Object.entries(plan.input.limits).map(([k,v])=>`<p class="hint">${e({cost:'预算',credits:'学分',teacher_hours:'师资课时',lab_hours:'实验室课时',study_hours:'学习课时',months:'期限（月）'}[k])}：${fmt(v)}</p>`).join('')}`);});

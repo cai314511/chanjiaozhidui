@@ -1,7 +1,8 @@
 import math
 
 import numpy as np
-from scipy.optimize import Bounds, LinearConstraint, milp
+from scipy.optimize import Bounds, LinearConstraint
+from backend.solver import milp
 
 
 RESOURCES = ("cost", "credits", "teacher_hours", "lab_hours", "study_hours")

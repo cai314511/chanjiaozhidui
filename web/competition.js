@@ -1,4 +1,5 @@
 import {state,e,fmt,money,api,post,on,button,field,check,heading,empty,dialog,closeDialog,toast,navigate,values,num} from './core.js';
+import {selectUniversityReport} from './university-report.js';
 
 const types={recruitment:'招聘证据',employment:'就业反馈',policy:'产业政策'};
 const statuses={ready:'可进行条件推演',partial:'部分结果，仍有数据缺项',incomplete:'数据不完整',no_improving_plan:'未找到有证据支持的改善组合'};
@@ -86,7 +87,9 @@ on('decision-result',async el=>showRun(await api('/competition/runs/'+el.dataset
 
 function showRun(run){
  const target=document.querySelector('#decision-output');if(!target)return;
+ selectUniversityReport('run_id',run.id);
  target.innerHTML=runHtml(run);
+ target.querySelector('.toolbar')?.insertAdjacentHTML('afterbegin',button('查看本轮图文报告','university-selected-report',run.id,'primary'));
  const scale=run.result.diagnosis.scale;
  if(scale)target.querySelector('.metrics')?.insertAdjacentHTML('afterend',`<p class="hint">供给观测年度 ${scale.supply_year} · 招聘参考年度 ${scale.demand_year}。${e(scale.time_alignment)}</p>`);
  target.scrollIntoView({behavior:'smooth',block:'start'});

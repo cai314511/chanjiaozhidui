@@ -11,6 +11,7 @@ from backend.evidence import PATTERNS, safe_text, sha256_file
 from backend.recruitment_data import normalize_recruitment, read_recruitment, recruitment_fingerprint
 from backend.market import EXPLORATION_OPTIONS, TRACK_RULES, _tracks, company_id, normalized_company
 from backend.store import encode, now
+from backend.job_state import active_job
 
 
 DEMAND_ID = 'demand-observatory-v1'
@@ -215,7 +216,7 @@ def attach_university_intelligence(app, store, user):
         profiles = {item['owner']: item['data'] for item in reversed(store.list('company_profile'))}
         for item in store.list('job'):
             data = item['data']
-            if data.get('deleted') or data.get('closed') or data.get('status') in {'draft', 'paused', 'closed', 'archived'}:
+            if not active_job(data):
                 continue
             company = profiles.get(item['owner'], {}).get('name') or data.get('company', '')
             industry = str(data.get('industry') or '').strip()

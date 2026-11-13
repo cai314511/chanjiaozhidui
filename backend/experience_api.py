@@ -148,7 +148,7 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
     def update_interview(item, data, revision):
         with store.connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            row = db.execute('SELECT updated FROM entities WHERE id=?', (item['id'],)).fetchone()
+            row = db.execute('SELECT updated,data FROM entities WHERE id=?', (item['id'],)).fetchone()
             if row['updated'] != revision:
                 raise HTTPException(409, '面试内容已更新，请重新打开')
             # 撤回检查与面试写入属于同一事务。
@@ -156,7 +156,10 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
                 application = db.execute('SELECT data FROM entities WHERE id=?', (data['application_id'],)).fetchone()
                 if json.loads(application['data']).get('withdrawn'):
                     raise HTTPException(403, '投递已撤回')
-            db.execute('UPDATE entities SET data=?,updated=? WHERE id=?', (encode(data), now(), item['id']))
+            # ICE 追加独立于文字版本；提交文字时保留事务中最新的通话状态。
+            latest = json.loads(row['data'])
+            latest.update(messages=data['messages'], completed=data['completed'])
+            db.execute('UPDATE entities SET data=?,updated=? WHERE id=?', (encode(latest), now(), item['id']))
 
     def display(item):
         return {**flat(item), 'revision': item['updated']}
@@ -178,11 +181,13 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
     def start_interview(payload: InterviewStart, current=Depends(user)):
         role(current, ['student'])
         questions = []
+        job_version = None
         if payload.application_id:
             application, job = application_access(payload.application_id, current)
             if application['data'].get('withdrawn'):
                 raise HTTPException(403, '投递已撤回')
             questions = job['data']['questions']
+            job_version = job['data']['version']
         elif payload.mode in {'preset', 'human'}:
             raise HTTPException(422, '请先选择已投递岗位')
         if payload.mode == 'preset' and not questions:
@@ -191,7 +196,7 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
             '等待企业面试官加入。' if payload.mode == 'human' else
             '你好，先聊聊你最近完成的一件事情：你希望解决什么问题，具体做了什么？')
         ident = store.save('interview', current['id'], {'mode': payload.mode, 'application_id': payload.application_id,
-                           'questions': questions, 'messages': [{'role': 'assistant', 'text': first}],
+                           'questions': questions, 'job_version': job_version, 'messages': [{'role': 'assistant', 'text': first}],
                            'signals': [], 'consent': payload.consent, 'completed': False})
         return display(entity(ident, 'interview'))
 
@@ -211,6 +216,7 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
             raise HTTPException(409, '面试内容已更新')
         messages = data['messages'] + [{'role': 'user', 'text': payload.text}]
         if data['mode'] == 'preset':
+            messages[-1]['question_id'] = data['questions'][sum(m['role'] == 'user' for m in data['messages'])]['id']
             index = sum(m['role'] == 'user' for m in messages)
             completed = index >= len(data['questions'])
             reply = '回答已记录，你可以核对后提交给企业。' if completed else data['questions'][index]['title']
@@ -232,23 +238,35 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
     @app.post('/api/interviews/{ident}/signal')
     def signal(ident: str, payload: Signal, current=Depends(user)):
         item = interview_access(ident, current)
-        data = item['data']
-        if data['mode'] != 'human':
+        if item['data']['mode'] != 'human':
             raise HTTPException(422, '当前会话没有真人通话')
         if payload.kind == 'offer' and current['id'] != item['owner']:
             raise HTTPException(403, '仅学生可以发起通话')
         if payload.kind == 'answer' and current['id'] == item['owner']:
             raise HTTPException(403, '应由企业面试官接听')
-        if payload.kind == 'offer':
-            data = {**data, 'signals': [], 'call_id': payload.call_id}
-        elif data.get('call_id') != payload.call_id:
-            raise HTTPException(409, '通话轮次已变化，请重新接通')
-        if len(encode(payload.payload)) > 24000 or len(data['signals']) >= 150:
+        if len(encode(payload.payload)) > 24000:
             raise HTTPException(422, '通话信令超出限制，请重新创建会话')
-        signals = data['signals'] + [{'actor': current['id'], 'kind': payload.kind, 'payload': payload.payload, 'call_id': payload.call_id}]
-        if payload.kind == 'leave':
-            data = {**data, 'call_id': None}
-        update_interview(item, {**data, 'signals': signals}, payload.revision)
+        with store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT data,updated FROM entities WHERE id=?', (ident,)).fetchone()
+            data = json.loads(row['data'])
+            application = db.execute('SELECT data FROM entities WHERE id=?', (data['application_id'],)).fetchone()
+            if json.loads(application['data']).get('withdrawn'):
+                raise HTTPException(403, '投递已撤回')
+            if payload.kind == 'offer':
+                if payload.revision != row['updated']:
+                    raise HTTPException(409, '面试内容已更新，请重新打开')
+                data.update(signals=[], call_id=payload.call_id)
+            elif data.get('call_id') != payload.call_id:
+                raise HTTPException(409, '通话轮次已变化，请重新接通')
+            if len(data['signals']) >= 150:
+                raise HTTPException(422, '通话信令超出限制，请重新创建会话')
+            data['signals'].append({'actor': current['id'], 'kind': payload.kind, 'payload': payload.payload, 'call_id': payload.call_id})
+            if payload.kind == 'leave':
+                data['call_id'] = None
+            # 开始或结束通话改变协商版本，候选按当前轮次原子追加。
+            stamp = now() if payload.kind in {'offer', 'leave'} else row['updated']
+            db.execute('UPDATE entities SET data=?,updated=? WHERE id=?', (encode(data), stamp, ident))
         return display(interview_access(ident, current))
 
     @app.post('/api/interviews/{ident}/leave')
