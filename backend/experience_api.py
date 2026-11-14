@@ -143,6 +143,10 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
                 raise HTTPException(403, '投递已撤回，面试会话已关闭')
         elif item['owner'] != current['id']:
             raise HTTPException(403, '只能访问自己的访谈')
+        if item['data'].get('invitation_id'):
+            from backend.recruiting_workflow import validate_invitation_room
+            with store.connect() as db:
+                validate_invitation_room(db, item['data'], ident)
         return item
 
     def update_interview(item, data, revision):
@@ -158,8 +162,20 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
                     raise HTTPException(403, '投递已撤回')
             # ICE 追加独立于文字版本；提交文字时保留事务中最新的通话状态。
             latest = json.loads(row['data'])
+            if latest.get('invitation_id'):
+                from backend.recruiting_workflow import validate_invitation_room
+                validate_invitation_room(db, latest, item['id'])
             latest.update(messages=data['messages'], completed=data['completed'])
             db.execute('UPDATE entities SET data=?,updated=? WHERE id=?', (encode(latest), now(), item['id']))
+
+    @app.get('/api/interviews/{ident}/connectivity')
+    def interview_connectivity(ident: str, current=Depends(user)):
+        item = interview_access(ident, current)
+        if item['data']['mode'] != 'human':
+            raise HTTPException(422, '当前会话没有真人通话')
+        from backend.interview_connectivity import connectivity
+        return Response(encode(connectivity(current['id'])), media_type='application/json',
+                        headers={'Cache-Control': 'no-store'})
 
     def display(item):
         return {**flat(item), 'revision': item['updated']}
@@ -250,6 +266,9 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT data,updated FROM entities WHERE id=?', (ident,)).fetchone()
             data = json.loads(row['data'])
+            if data.get('invitation_id'):
+                from backend.recruiting_workflow import validate_invitation_room
+                validate_invitation_room(db, data, ident)
             application = db.execute('SELECT data FROM entities WHERE id=?', (data['application_id'],)).fetchone()
             if json.loads(application['data']).get('withdrawn'):
                 raise HTTPException(403, '投递已撤回')

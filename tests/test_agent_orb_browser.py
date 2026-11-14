@@ -68,10 +68,14 @@ def test_agent_states_and_close_release(browser_system, role):
 def test_agent_voice_confirmation_and_webgl_fallback(browser_system, role):
     browser, base = browser_system
     page = browser.new_page(reduced_motion='reduce')
-    page.add_init_script("""navigator.mediaDevices.getUserMedia=async()=>{
+    page.add_init_script("""const Recorder=window.MediaRecorder;
+      window.MediaRecorder=class extends Recorder{constructor(...args){super(...args);
+        this.addEventListener('dataavailable',event=>{if(event.data.size)window.testRecordedChunk=true});
+      }};
+      navigator.mediaDevices.getUserMedia=async()=>{
       const context=new AudioContext(), source=context.createOscillator(), gain=context.createGain();
       gain.gain.value=.08; const output=context.createMediaStreamDestination();
-      source.connect(gain);gain.connect(output);source.start();
+      source.connect(gain);gain.connect(output);source.start();await context.resume();
       window.testMicTracks=output.stream.getTracks();return output.stream;
     };""")
     page.route('**/api/voice/transcribe', lambda route: route.fulfill(json={'text': '隔离转写，可编辑'}))
@@ -83,7 +87,8 @@ def test_agent_voice_confirmation_and_webgl_fallback(browser_system, role):
     speech = page.locator('#agent-form .agent-speech')
     speech.click()
     expect(page.locator('#agent-orb-status')).to_have_text('正在倾听')
-    page.wait_for_function("()=>window.testMicTracks && document.querySelector('.agent-orb-stage').dataset.volume > 0")
+    # 转写验收需有声编码片段，不能在录音头部的第一个微弱非零振幅就停止。
+    page.wait_for_function("()=>window.testRecordedChunk===true && Number(document.querySelector('.agent-orb-stage').dataset.volume)>0.2")
     speech.click()
     expect(page.locator('#agent-form textarea')).to_have_value('隔离转写，可编辑')
     assert not requests

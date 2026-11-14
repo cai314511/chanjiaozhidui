@@ -16,6 +16,20 @@ from pypdf.errors import PdfReadError
 from backend.documents import extract, MAX_SIZE
 from backend.store import now
 from backend.course_import import normalize_course, parse_schedule, MAX_COURSES
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class CourseRevision(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    code: str = Field(min_length=1, max_length=100)
+    hours: float | None = Field(default=None, ge=0, le=10000)
+    skills: list[str] | None = Field(default=None, max_length=100)
+    source_note: str = Field(min_length=1, max_length=2000)
+    confirmed: bool
+
+
+class CourseRevisions(BaseModel):
+    revisions: list[CourseRevision] = Field(min_length=1, max_length=1000)
 
 def attach_university_courses(app,store,user):
     def school(current):
@@ -27,6 +41,43 @@ def attach_university_courses(app,store,user):
         school(current)
         rows=store.list('university_course_catalog',current['id'])
         return rows[0]['data'] if rows else {'courses':[],'sources':[]}
+
+    @app.patch('/api/university/courses')
+    def revise_courses(payload: CourseRevisions, current=Depends(user)):
+        school(current)
+        from backend.store import encode
+        with store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            ident = 'university-courses:' + current['id']
+            row = db.execute('SELECT data,owner,kind FROM entities WHERE id=?', (ident,)).fetchone()
+            if not row or row['owner'] != current['id'] or row['kind'] != 'university_course_catalog':
+                raise HTTPException(422, '请先导入本校课程库')
+            catalog = json.loads(row['data'])
+            courses = {c['code']: c for c in catalog['courses']}
+            if len({r.code for r in payload.revisions}) != len(payload.revisions):
+                raise HTTPException(422, '同批课程代码重复')
+            for revision in payload.revisions:
+                if revision.code not in courses:
+                    raise HTTPException(422, '课程不存在：' + revision.code)
+                course = courses[revision.code]
+                if not revision.confirmed:
+                    raise HTTPException(422, '请确认修订字段及其来源后保存')
+                for key in ('hours', 'skills'):
+                    if key not in revision.model_fields_set:
+                        continue
+                    value = getattr(revision, key)
+                    if key == 'skills':
+                        value = list(dict.fromkeys(s.strip() for s in value or [] if s.strip()))
+                        if any(len(s) > 100 for s in value):
+                            raise HTTPException(422, '能力标签不能超过100字')
+                    course[key] = value
+                    course.setdefault('field_confirmations', {})[key] = True
+                    course.setdefault('field_sources', {})[key] = {
+                        'kind': 'teacher_review', 'note': revision.source_note, 'confirmed_at': now()}
+            db.execute('UPDATE entities SET data=?,updated=? WHERE id=?', (encode(catalog), now(), ident))
+            db.execute('INSERT INTO audit(actor,action,target,created) VALUES(?,?,?,?)',
+                       (current['id'], 'confirm_course_fields', ident, now()))
+        return {'updated_courses': len(payload.revisions), 'message': '已保存课程修订及确认来源'}
 
     @app.get('/api/university/courses/export')
     def export_courses(current=Depends(user)):

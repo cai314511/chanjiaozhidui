@@ -88,7 +88,10 @@ async function openSession(data){
  };
  try{const {WaterOrb}=await import('./water-orb.js');if(!valid(session))return;const stage=document.querySelector('.droplet-stage');waterOrb=new WaterOrb(stage);waterOrb.setMode(stage.dataset.mode||'idle');stage.addEventListener('water-error',event=>showError(new Error(event.detail)),{once:true})}catch(err){if(valid(session))showError(new Error('三维水滴无法启动，请检查浏览器硬件加速。语音与文字功能仍可使用。'))}
  if(!valid(session))return;
- if(data.mode==='human')document.querySelector('#human-connect').onclick=()=>connectHuman(session).catch(showError);
+ if(data.mode==='human'){
+  document.querySelector('#human-connect').onclick=()=>connectHuman(session).catch(showError);
+  const hangup=document.createElement('button');hangup.id='human-disconnect';hangup.className='btn';hangup.textContent='挂断音频';hangup.onclick=()=>disconnectHuman(session).catch(showError);document.querySelector('#human-connect').after(hangup);
+ }
  else if(!session.interacted&&!recording&&!session.gettingStream&&!session.finishing&&!session.sending&&document.querySelector('.droplet-stage').dataset.mode!=='error')localSpeak(data.messages.filter(m=>m.role==='assistant').at(-1).text,session).catch(showError);
 }
 function showError(err){if(err.name==='AbortError')return;const target=document.querySelector('#voice-error');if(target)target.textContent=err.message;setStatus('error',err.name==='NotAllowedError'?'麦克风权限未开启，请允许访问后重试':'本轮操作未完成，可以重试');}
@@ -154,19 +157,31 @@ async function sendSignal(session,kind,payload){
  const pending=(session.signalQueue||Promise.resolve()).then(send);
  session.signalQueue=pending.catch(()=>{});return pending;
 }
+async function disconnectHuman(session){
+ const callId=session.callId;let synchronized=true;
+ try{if(callId)await post('/interviews/'+session.data.id+'/leave',{call_id:callId});}
+ catch(err){synchronized=false;showError(err);}
+ finally{if(valid(session)){clearTimeout(pollTimer);peer?.close();peer=null;callStream?.getTracks().forEach(track=>track.stop());callStream=null;session.callId=null;const audio=document.querySelector('#remote-audio');audio.srcObject=null;audio.hidden=true;setStatus('idle',synchronized?'音频已挂断，可以重新接通':'音频已在本机挂断，结束状态未同步');}}
+}
 async function connectHuman(session){
  if(peer||session.connecting)return;
  session.connecting=true;let acquired;
- try{acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}finally{session.connecting=false;}
+ let network;
+ try{network=await api('/interviews/'+session.data.id+'/connectivity');if(!valid(session))return;acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}finally{session.connecting=false;}
  if(!valid(session)){acquired.getTracks().forEach(track=>track.stop());return;}
  callStream=acquired;
- peer=new RTCPeerConnection({iceServers:[]});callStream.getTracks().forEach(track=>peer.addTrack(track,callStream));
+ peer=new RTCPeerConnection({iceServers:network.iceServers});callStream.getTracks().forEach(track=>peer.addTrack(track,callStream));
+ let diagnostic=document.querySelector('#connection-diagnostic');if(!diagnostic){diagnostic=document.createElement('p');diagnostic.id='connection-diagnostic';diagnostic.className='hint';document.querySelector('#voice-status').after(diagnostic);}diagnostic.textContent=network.message;
  const pc=peer,pending=[];signalCursor=0;
  const localCandidates=[];let descriptionSent=false;
  const publishCandidates=async()=>{descriptionSent=true;for(const candidate of localCandidates.splice(0))await sendSignal(session,'candidate',candidate);};
  pc.onicecandidate=event=>{if(!event.candidate||!valid(session)||peer!==pc)return;if(!descriptionSent)localCandidates.push(event.candidate.toJSON());else sendSignal(session,'candidate',event.candidate.toJSON()).catch(showError);};
  pc.ontrack=event=>{const audio=document.querySelector('#remote-audio');audio.hidden=false;audio.srcObject=event.streams[0];audio.play().catch(showError);};
- pc.onconnectionstatechange=()=>{if(valid(session)){if(pc.connectionState==='connected')document.querySelector('#voice-error').textContent='';setStatus(pc.connectionState==='connected'?'speaking':'idle',pc.connectionState==='connected'?'真人音频已接通':pc.connectionState==='failed'?'音频连接失败，请检查网络和浏览器权限':'正在连接企业面试官');}};
+ pc.onconnectionstatechange=()=>{if(valid(session)&&pc.connectionState!=='closed'){
+  if(pc.connectionState==='connected'){document.querySelector('#voice-error').textContent='';pc.getStats().then(stats=>{if(!valid(session))return;const pair=[...stats.values()].find(s=>s.type==='candidate-pair'&&s.state==='succeeded'&&s.nominated);const local=pair&&stats.get(pair.localCandidateId),remote=pair&&stats.get(pair.remoteCandidateId);diagnostic.textContent=(local?.candidateType==='relay'||remote?.candidateType==='relay'?'音频通过中继连接':'音频通过直连连接')+' · 当前连接成功不代表其他网络已验收';}).catch(showError);}
+  setStatus(pc.connectionState==='connected'?'speaking':'idle',pc.connectionState==='connected'?'真人音频已接通':pc.connectionState==='failed'?'音频连接失败：请检查网络权限及中继服务配置':pc.connectionState==='disconnected'?'音频连接已中断，请检查网络后重新接通':'正在连接企业面试官');
+  if(pc.connectionState==='failed'){pc.close();if(peer===pc){peer=null;callStream?.getTracks().forEach(track=>track.stop());callStream=null;}}
+ }};
  const caller=session.data.owner===state.user.id;
  if(caller){session.data=await api('/interviews/'+session.data.id);session.callId=crypto.randomUUID();const offer=await pc.createOffer();await pc.setLocalDescription(offer);await sendSignal(session,'offer',pc.localDescription.toJSON());await publishCandidates();}
  const poll=async()=>{

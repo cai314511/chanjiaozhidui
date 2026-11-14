@@ -16,6 +16,7 @@ from backend import competition_schemas as c
 from backend.decision import VERSION, changed_skills, demand_profile, run_decision, structural_score
 from backend.governance import clean_records, contains_identifiers, validate_source
 from backend.store import encode, now, uid
+from backend.university_report_metadata import report_source_versions, workspace_input_fingerprint
 
 
 RULES = [
@@ -93,6 +94,10 @@ def attach_competition(app, store, user, role, owned, entity, flat):
         return item
 
     def checked_case(payload, current):
+        if payload.workspace_id:
+            workspace = owned(payload.workspace_id, current, 'university_workspace')
+            if workspace_input_fingerprint(workspace['data']) != payload.workspace_input_hash:
+                raise HTTPException(409, '培养工作区输入已变化，请刷新并确认后再保存高级方案')
         dataset(payload.recruitment_id, current, 'recruitment')
         if payload.employment_id:
             dataset(payload.employment_id, current, 'employment')
@@ -100,7 +105,7 @@ def attach_competition(app, store, user, role, owned, entity, flat):
             dataset(ident, current, 'policy')
         data = payload.model_dump()
         # 引用ID已逐项通过归属验证；随机摘要中偶然出现的数字不是联系方式。
-        content = {key: value for key, value in data.items() if key not in {'recruitment_id', 'employment_id', 'policy_ids'}}
+        content = {key: value for key, value in data.items() if key not in {'recruitment_id', 'employment_id', 'policy_ids', 'workspace_id', 'workspace_input_hash'}}
         if contains_identifiers(json.dumps(content, ensure_ascii=False)):
             raise HTTPException(422, '参赛培养方案含联系方式或个人标识，请脱敏后提交')
         return data
@@ -250,6 +255,10 @@ def attach_competition(app, store, user, role, owned, entity, flat):
     def execute_case(ident: str, current=Depends(user)):
         researcher(current)
         case = owned(ident, current, 'decision_case')['data']
+        if case.get('workspace_id'):
+            workspace = owned(case['workspace_id'], current, 'university_workspace')
+            if workspace_input_fingerprint(workspace['data']) != case.get('workspace_input_hash'):
+                raise HTTPException(409, '培养工作区输入已变化，请在向导确认并保存新的高级方案后测算')
         rec = dataset(case['recruitment_id'], current, 'recruitment')
         emp = dataset(case['employment_id'], current, 'employment') if case.get('employment_id') else None
         policies = [dataset(i, current, 'policy') for i in case.get('policy_ids', [])]
@@ -260,7 +269,10 @@ def attach_competition(app, store, user, role, owned, entity, flat):
         provenance = [{'dataset_id': d['id'], 'sha256': d['data']['sha256'], 'source': d['data']['source_snapshot'],
                        'processing': d['data']['processing']} for d in [rec, *([emp] if emp else []), *policies]]
         data = {'case_id': ident, 'case': case, 'result': result, 'provenance': provenance,
+                'source_versions': report_source_versions(store, current['id'], case, provenance),
                 'policy_use': '政策作为定性证据附件；未将政策文本直接折算为招聘人数或预测系数'}
+        catalogs = store.list('university_course_catalog', current['id'])
+        data['catalog_snapshot'] = catalogs[0]['data'] if catalogs else None
         run_id = store.save('decision_run', current['id'], data)
         store.audit(current['id'], 'run_professional_decision', run_id)
         return {'id': run_id, **public_result(data)}

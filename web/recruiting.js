@@ -1,9 +1,10 @@
 import {state,actions,api,post,on,e,fmt,button,heading,empty,dialog,closeDialog,refresh,navigate,resetIdentity,toast} from './core.js';
 import {companyBrand,bindCompanyBrands} from './company-brand.js';
+import {workflowPanel} from './recruiting-workflow.js';
 
 const statuses={draft:'草稿',published:'招聘中',paused:'已暂停',closed:'已结束'};
-const stages={new:'新投递',reviewing:'评估中',interview:'面试中',offer:'已发意向',declined:'暂不合适'};
-let charts=[],observer=null,chartSequence=0,messageTimer=null,selectedThread=null;
+const stages={new:'新投递',reviewing:'评估中',interview:'面试中',offer:'意向沟通（阶段标签）',declined:'暂不合适'};
+let charts=[],observer=null,chartSequence=0,messageTimer=null,selectedThread=null,qualificationFilter='',jobQualificationFilter='';
 function dispose(){chartSequence++;charts.forEach(c=>c.dispose());charts=[];observer?.disconnect();observer=null;clearTimeout(messageTimer);}
 window.addEventListener('navigate',dispose);
 window.addEventListener('identity-reset',()=>{dispose();selectedThread=null;});
@@ -50,7 +51,12 @@ function candidateCard(c){
  return `<article class="recruit-candidate"><div class="inline"><span class="avatar">${e(c.name.slice(0,1))}</span><div><h4>${e(c.name)}</h4><p class="hint">${e(c.school)} · ${e(c.major)}</p></div>${c.favorite?'<span class="tag">已收藏</span>':''}</div><p>${e(c.career.slice(0,90))}</p><div class="chips">${c.applications.map(a=>`<span class="tag">${e(a.title)} · ${stages[a.stage]}</span>`).join('')}</div><div class="inline">${button('主页与简历','candidate-detail',c.id,'small primary')}${button(c.favorite?'取消收藏':'收藏人才',c.favorite?'candidate-unstar':'candidate-star',c.id,'small')}${button('联系','contact-person',c.id,'small')}</div>${a?`<div class="inline recruiting-quick">${button('测评复核','review',a.id,'small')}${button('双向匹配','application-detail',a.id,'small')}</div>`:''}</article>`;
 }
 
-export async function candidatesPage(favorites=false){const all=await api('/recruiting/candidates'),items=favorites?all.filter(c=>c.favorite):all;return heading(favorites?'人才收藏':'候选人管理','按授权投递查看学生主页、项目作品与匹配情况。')+`<div class="recruiting-candidates">${items.map(candidateCard).join('')||empty(favorites?'还没有收藏的人才':'等待候选人投递','学生提交授权材料后，可查看主页、收藏并联系。')}</div>`;}
+export async function candidatesPage(favorites=false){
+ const all=await api('/recruiting/candidates?qualification_status='+encodeURIComponent(qualificationFilter)),items=favorites?all.filter(c=>c.favorite):all;
+ const filter=`<div class="toolbar"><label>毕业与学历资格<select id="qualification-filter">${[['','全部资格状态'],['eligible','符合'],['excluded','不符合'],['pending','待核实']].map(([v,n])=>`<option value="${v}" ${qualificationFilter===v?'selected':''}>${n}</option>`).join('')}</select></label></div>`;
+ const cards=items.map(c=>`<div class="recruiting-candidate-record">${candidateCard(c)}<div class="qualification-summary">${c.applications.map(a=>`<p><strong>${e(a.title)} · ${{eligible:'符合',excluded:'不符合',pending:'待核实'}[a.qualification.status]}</strong><span class="hint"> ${e(a.qualification.reasons.join('；')||'该岗位未限制毕业或学历资格')}</span>${button('邀约与正式意向','application-workflow',a.id,'small')}</p>`).join('')}</div></div>`).join('');
+ return heading(favorites?'人才收藏':'候选人管理','按授权投递查看学生主页、项目作品与匹配情况。')+filter+`<div class="recruiting-candidates">${cards||empty(favorites?'还没有收藏的人才':'暂无符合筛选的候选人','学生提交授权材料后，可查看主页、收藏并联系。')}</div>`;
+}
 
 on('candidate-detail',async el=>{
  const c=await api('/recruiting/candidates/'+el.dataset.id);
@@ -82,6 +88,22 @@ async function loadMessages(){
 
 export async function bindRecruiting(){
  bindCompanyBrands(document.querySelector('#page-content'));
+ if(state.user?.role==='student'&&state.route==='jobs'){
+  const epoch=state.sessionEpoch,rows=await api('/recruiting/job-qualifications');if(epoch!==state.sessionEpoch||state.route!=='jobs')return;
+  const toolbar=document.querySelector('#page-content .toolbar');
+  toolbar?.insertAdjacentHTML('beforeend',`<label>毕业与学历资格<select id="student-qualification-filter">${[['','全部'],['eligible','符合'],['excluded','不符合'],['pending','待核实']].map(([v,n])=>`<option value="${v}" ${jobQualificationFilter===v?'selected':''}>${n}</option>`).join('')}</select></label>`);
+  const applyFilter=()=>document.querySelectorAll('#page-content .job-card').forEach(card=>{const ident=card.querySelector('[data-action="student-match"]')?.dataset.id,q=rows[ident];if(!q)return;card.hidden=!!jobQualificationFilter&&q.status!==jobQualificationFilter;});
+  document.querySelectorAll('#page-content .job-card').forEach(card=>{const ident=card.querySelector('[data-action="student-match"]')?.dataset.id,q=rows[ident];if(q)card.querySelector('.job-description')?.insertAdjacentHTML('afterend',`<p class="qualification-summary"><strong>毕业与学历资格：${{eligible:'符合',excluded:'不符合',pending:'待核实'}[q.status]}</strong> ${e(q.reasons.join('；')||'该岗位未限制毕业与学历资格')}</p>`);});
+  document.querySelector('#student-qualification-filter')?.addEventListener('change',event=>{jobQualificationFilter=event.target.value;applyFilter();});applyFilter();
+ }
+ document.querySelector('#qualification-filter')?.addEventListener('change',event=>{qualificationFilter=event.target.value;navigate(state.route);});
+ document.querySelectorAll('#page-content [data-action="application-detail"]').forEach(el=>{if(!el.parentElement.querySelector('[data-action="application-workflow"]'))el.insertAdjacentHTML('afterend',button('邀约与正式意向','application-workflow',el.dataset.id,'small'));});
+ if(state.user&&['student','employer'].includes(state.user.role)&&['messages','applications','home'].includes(state.route)){
+  const epoch=state.sessionEpoch,target=document.querySelector('#page-content'),route=state.route,marker=document.createElement('div');target.append(marker);
+  const panel=await workflowPanel();
+  if(epoch!==state.sessionEpoch||route!==state.route||!marker.isConnected)return;
+  marker.outerHTML=panel;
+ }
  const allocation=document.querySelector('#allocation-form');
  if(state.demo&&allocation){
   allocation.elements.salary.value=state.jobs.reduce((s,j)=>s+j.salary_max*j.capacity,0);
@@ -97,6 +119,8 @@ export async function bindRecruiting(){
  if(!data.isConnected||sequence!==chartSequence)return;
  const palette=['#247b69','#719f97','#bd9c49','#436d79','#c0d4ce'];
  for(const host of document.querySelectorAll('[data-recruit-chart]')){
+  const chartRows=JSON.parse(host.dataset.recruitChart==='stages'?data.dataset.stages:data.dataset.jobs);
+  if(!chartRows.some(r=>host.dataset.recruitChart==='stages'?r.value>0:r.count>0||r.chosen>0)){host.innerHTML=empty('暂无招聘数据','收到有效投递后，这里将展示招聘阶段与岗位进展。');continue;}
   const chart=window.echarts.init(host,null,{renderer:'canvas'});charts.push(chart);
   if(host.dataset.recruitChart==='stages')chart.setOption({color:palette,tooltip:{trigger:'item'},legend:{bottom:0},series:[{type:'pie',radius:['45%','72%'],center:['50%','44%'],itemStyle:{borderRadius:9,borderColor:'#f5faf5',borderWidth:4},label:{formatter:'{b}\n{c}份'},data:JSON.parse(data.dataset.stages),animationDuration:950}]});
   else{const rows=JSON.parse(data.dataset.jobs);chart.setOption({color:[palette[0],palette[2]],tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},legend:{bottom:0},grid:{left:25,right:15,top:20,bottom:65,containLabel:true},xAxis:{type:'category',data:rows.map(r=>r.name),axisLabel:{rotate:25,fontSize:10}},yAxis:{type:'value',minInterval:1},series:[{name:'收到投递',type:'bar',barMaxWidth:24,data:rows.map(r=>r.count),itemStyle:{borderRadius:[5,5,0,0]}},{name:'双向意向',type:'bar',barMaxWidth:24,data:rows.map(r=>r.chosen),itemStyle:{borderRadius:[5,5,0,0]}}]});}

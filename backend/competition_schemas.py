@@ -93,6 +93,29 @@ class Observation(Model):
     evidence: str = Field(min_length=1, max_length=1000)
 
 
+class TeachingModule(Model):
+    name: str = Field(min_length=1, max_length=300)
+    hours: float | None = Field(default=None, ge=0, le=10000)
+    assessment: str = Field(default='', max_length=2000)
+
+
+class TeachingMilestone(Model):
+    year: str | int
+    title: str = Field(default='', max_length=300)
+    detail: str = Field(default='', max_length=2000)
+
+
+class TeachingPlan(Model):
+    confirmed: bool = False
+    old_modules: list[str] = Field(default_factory=list, max_length=100)
+    modules: list[TeachingModule] = Field(default_factory=list, max_length=100)
+    prerequisites: list[str] = Field(default_factory=list, max_length=100)
+    semester: str = Field(default='', max_length=300)
+    project: str = Field(default='', max_length=2000)
+    investment_notes: str = Field(default='', max_length=2000)
+    timeline: list[TeachingMilestone] = Field(default_factory=list, max_length=20)
+
+
 class BaselineCourse(Model):
     id: str = Field(min_length=1, max_length=100)
     name: str = Field(min_length=1, max_length=200)
@@ -103,6 +126,7 @@ class BaselineCourse(Model):
     teacher_hours: float = Field(ge=0, le=100000)
     lab_hours: float = Field(ge=0, le=100000)
     prerequisites: list[str] = Field(default_factory=list, max_length=100)
+    teaching_plan: TeachingPlan | None = None
 
 
 class ProgramConstraints(Model):
@@ -184,6 +208,7 @@ class Action(Model):
     cost: float = Field(ge=0, le=1e10)
     skill_delta: dict[str, float] = Field(max_length=100)
     evidence: str = Field(min_length=1, max_length=2000)
+    teaching_plan: TeachingPlan | None = None
 
     @model_validator(mode="after")
     def valid(self):
@@ -238,9 +263,13 @@ class DecisionCase(Model):
     market_scope_confirmed: bool = False
     annual_demand_confirmed: bool = False
     max_rounds: int = Field(default=5, ge=1, le=10)
+    workspace_id: str | None = Field(default=None, max_length=100)
+    workspace_input_hash: str | None = Field(default=None, min_length=64, max_length=64)
 
     @model_validator(mode="after")
     def valid(self):
+        if bool(self.workspace_id) != bool(self.workspace_input_hash):
+            raise ValueError('工作区标识和输入摘要必须同时提供')
         if {s.name for s in self.scenarios} != {'乐观', '基准', '悲观'} or abs(sum(s.probability for s in self.scenarios) - 1) > 1e-8:
             raise ValueError("必须包含三种不同情景，主观情景概率之和为1")
         if not self.admissions.min_seats <= self.program.current_seats <= self.admissions.max_seats:

@@ -12,7 +12,7 @@ from backend.app import create_app
 from tests.test_api import job_data
 from tests.test_browser import route
 
-OUT=ROOT/'runtime'/'system-audit-20261113'/'employer'
+OUT=ROOT/'runtime'/'remaining-fixes-20261114'/'audio'
 
 
 def main():
@@ -102,6 +102,16 @@ def main():
                     assert any(peer['connection']=='connected' and any(stat['bytesReceived']>0 and stat['packetsReceived']>0 for stat in peer['stats']) for peer in entry['peers']),entry
                 for p,handler in handlers:
                     p.remove_listener('response',handler)
+                if attempt == 'student_offer_then_employer':
+                    stu.locator('#human-disconnect').click()
+                    expect(stu.locator('#voice-status')).to_have_text('音频已挂断，可以重新接通')
+                    expect(emp.locator('#voice-status')).to_have_text('通话已结束，可以重新接通', timeout=10000)
+                    stu.locator('#human-connect').click()
+                    emp.locator('#human-connect').click()
+                    expect(stu.locator('#voice-status')).to_have_text('真人音频已接通', timeout=15000)
+                    expect(emp.locator('#voice-status')).to_have_text('真人音频已接通', timeout=15000)
+                    report['hangup_and_reconnect'] = True
+                    (OUT/'interview-fix-results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
                 for p in [stu,emp]:
                     p.locator('[data-action=close-modal]').first.click()
             browser.close()

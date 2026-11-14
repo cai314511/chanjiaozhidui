@@ -14,6 +14,7 @@ import {mySpacePage,publishedStudentsPage,bindMySpace} from './my-space.js';
 import {universityInputHub,bindUniversityCourses,universityMaterialsPage} from './university-courses.js';
 import {universityIntelligencePage,bindUniversityIntelligence} from './university-intelligence.js';
 import {universityReportPage,bindUniversityReport} from './university-report.js';
+import {universityWorkspacePage,bindUniversityWorkspace} from './university-workspace.js';
 import {bindRoleMascots} from './role-mascots.js';
 import {demoToolbar,recruitingHome,employerJobs,candidatesPage,companyPage,messagesPage,bindRecruiting,employerInputHub} from './recruiting.js';
 
@@ -24,6 +25,7 @@ routes.admin=['⌘','统一管理入口'];
 routes.evidence=['▥','产业数据支撑'];
 routes['my-space']=['♧','我的'];routes.students=['♧','学生主页'];routes.home[1]='探索首页';
 routes.company=['⌂','公司主页'];routes.favorites=['☆','人才收藏'];routes.messages=['✉','消息中心'];
+routes['university-workspace']=['◈','培养方案向导'];
 function allowed(){
  const role=state.user?.role;
  routes.home[1]=role==='university'?'需求研判中心':role==='employer'?'招聘总览':'探索首页';
@@ -35,7 +37,7 @@ function allowed(){
  if(role==='admin')return ['admin','home','students','evidence','model'];
  if(state.publicDemo&&role==='university')return ['home','evidence','research','decision','rules','model'];
  if(role==='employer')return ['home','company','jobs','applications','favorites','messages','allocation','weights','students','evidence','documents','model'];
- return ['home',...(role==='student'?['my-space','profile','jobs','applications','messages','curriculum']:role==='university'?['university','research','decision','rules','jobs','curriculum']:[]),...(role?['students','evidence','documents']:[]),'model'];
+ return ['home',...(role==='student'?['my-space','profile','jobs','applications','messages','curriculum']:role==='university'?['university-workspace','university','research','decision','rules','jobs','curriculum']:[]),...(role?['students','evidence','documents']:[]),'model'];
 }
 function shell(){return `<div class="shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#home" data-action="route" data-id="home"><span class="brand-mark" aria-hidden="true"><img src="/assets/product-logo.png" alt="" width="1254" height="1254"></span><div><h2>智链产教</h2><small>连接产业与人才成长</small></div></a><div class="nav-label">${state.user?roleNames[state.user.role]+' / 工作空间':'探索 / 产教协同'}</div><nav class="nav" aria-label="主导航">${allowed().map(k=>`<button class="${state.route===k?'active':''}" data-action="route" data-id="${k}"><span class="nav-icon">${routes[k][0]}</span>${routes[k][1]}</button>`).join('')}</nav><div class="sidebar-foot"><div class="status"><span class="dot ${state.health.agent_configured?'live':'off'}"></span>${state.health.agent_configured?'DeepSeek · 已配置':'DeepSeek · 待配置'}</div><small>发现方向 · 展示经历 · 双向选择</small><div class="account"><span class="avatar">${state.user?e(state.user.name.slice(0,1)):'访'}</span><div class="account-info"><strong>${state.user?e(state.user.name):'访客'}</strong><small>${state.user?roleNames[state.user.role]:'登录后进入工作空间'}</small></div><button class="logout" data-action="${state.user?'logout':'login'}">${state.user?'退出':'登录'}</button></div></div></aside><main class="main"><header class="topbar"><div class="inline"><button class="mobile-menu" data-action="mobile-menu" aria-label="切换导航">☰</button><span class="breadcrumb">智链产教　/　${routes[state.route]?.[1]||'探索首页'}</span></div><div class="topbar-right"><span class="tag">产业 × 人才成长</span>${state.user?'<span class="status"><span class="dot live"></span>本地工作空间</span>':'<button class="text-button" data-action="register">注册 / 登录 ↗</button>'}</div></header><div class="page" id="page-content"><div class="loading">正在读取工作空间</div></div><footer class="footnote"><span>智链产教 · 基于岗位技能证据与资源约束的高校专业调整决策系统</span><span>兴趣探索 → 双向选择 → 培养决策</span></footer></main></div>`;}
 let renderSequence=0;
@@ -77,6 +79,7 @@ async function render(){
    case'weights':html=weightsPage();break;
    case'allocation':html=allocationPage();break;
    case'university':html=await universityReportPage();break;
+   case'university-workspace':html=await universityWorkspacePage();break;
    case'curriculum':html=await curriculumPage();break;
    case'documents':html=state.user?.role==='university'?await universityMaterialsPage():await documentsPage();break;
    case'research':html=await evidenceTeaser()+await researchDataPage();break;
@@ -92,6 +95,7 @@ async function render(){
   await bindRecruiting();
   if(state.user&&!state.publicDemo&&['jobs','curriculum','decision','research'].includes(state.route))document.querySelector('#page-content .section-head')?.insertAdjacentHTML('afterend',state.user.role==='university'?universityInputHub():state.user.role==='employer'?employerInputHub():inputHub());
   bindUniversityCourses();
+  await bindUniversityWorkspace();
   await bindUniversityIntelligence();
   await bindUniversityReport();
   if(state.route==='documents'&&state.user.role!=='university')await appendPortfolio();

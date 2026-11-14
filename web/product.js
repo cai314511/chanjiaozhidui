@@ -29,8 +29,11 @@ export async function profilePage(draft=null){
 }
 export function bindProfile(){
  const form=document.querySelector('#profile-form');if(!form)return;
+ const profile=state.profile||{};
+ form.querySelector('.grid2').insertAdjacentHTML('beforeend',`${field('毕业年月（自报）','graduation_month',profile.graduation_month||'','month')}<label>学历（自报）<select name="degree">${['','专科','本科','硕士','博士'].map(v=>`<option value="${v}" ${profile.degree===v?'selected':''}>${v||'待补充'}</option>`).join('')}</select></label><label>学业状态（自报）<select name="academic_status">${['','在读','已毕业','休学','结业'].map(v=>`<option value="${v}" ${profile.academic_status===v?'selected':''}>${v||'待补充'}</option>`).join('')}</select></label><p class="hint">毕业年月、学历与学业状态由你填写，尚未经过学校认证。企业依据你授权的证明逐项核验。</p>`);
  form.addEventListener('submit',async event=>{event.preventDefault();const values=Object.fromEntries(new FormData(form)),p=state.profile;
   const payload={major:values.major,school_name:values.school_name,career:values.career,experience:values.experience,language:values.language,school_code:values.school_code,abilities:p.abilities||{},preferences:{...p.preferences,cities:values.cities.split(/[，,]/).map(v=>v.trim()).filter(Boolean),salary_target:Number(values.salary_target||0)},resources:{budget:Number(values.resource_budget||0),study_hours:Number(values.resource_study_hours||0),months:Number(values.resource_months||0)}};
+  Object.assign(payload,{graduation_month:values.graduation_month,degree:values.degree,academic_status:values.academic_status});
   try{await put('/profile',payload);toast('画像已保存；你可以继续补充经历');}catch(err){toast(err.message);}
  });
 }

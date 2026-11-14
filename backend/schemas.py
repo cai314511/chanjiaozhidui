@@ -52,6 +52,11 @@ class Hard(Model):
 
 
 class Job(Model):
+    status: Literal['draft', 'published'] = 'published'
+    graduation_from: str = Field(default='', pattern=r'^$|^\d{4}-(0[1-9]|1[0-2])$')
+    graduation_to: str = Field(default='', pattern=r'^$|^\d{4}-(0[1-9]|1[0-2])$')
+    degrees: list[Literal['专科', '本科', '硕士', '博士']] = Field(default_factory=list)
+    academic_statuses: list[Literal['在读', '已毕业', '休学', '结业']] = Field(default_factory=list)
     title: str = Field(min_length=1, max_length=120)
     industry: str = Field(min_length=1, max_length=100)
     city: str = Field(min_length=1, max_length=40)
@@ -68,6 +73,8 @@ class Job(Model):
 
     @model_validator(mode="after")
     def valid(self):
+        if self.graduation_from and self.graduation_to and self.graduation_from > self.graduation_to:
+            raise ValueError('毕业年月范围起点不能晚于终点')
         if self.salary_min > self.salary_max:
             raise ValueError("薪资下限不能大于上限")
         names = [r.skill for r in self.requirements]
@@ -111,6 +118,9 @@ class LearningResources(Model):
 
 
 class Profile(Model):
+    graduation_month: str = Field(default='', pattern=r'^$|^\d{4}-(0[1-9]|1[0-2])$')
+    degree: Literal['', '专科', '本科', '硕士', '博士'] = ''
+    academic_status: Literal['', '在读', '已毕业', '休学', '结业'] = ''
     major: str = Field(default="", max_length=100)
     school_name: str = Field(default="", max_length=100)
     school_code: str = Field(default="", max_length=80)

@@ -139,6 +139,9 @@ def create_app(data_root=None, enable_demo=True):
             if job_version is not None and json.loads(job_row["data"])["version"] != job_version:
                 raise HTTPException(409, "岗位版本已变化，请重新打开测评页面")
             snapshot_application(db, latest, json.loads(job_row["data"]), current["id"], reason)
+            if reason == 'withdraw':
+                from backend.recruiting_workflow import release_application_workflow
+                release_application_workflow(db, item['id'], reason='withdrawn')
             updated = {**latest["data"], **changes}
             db.execute("UPDATE entities SET data=?,updated=? WHERE id=?", (encode(updated), now(), item["id"]))
         return updated
@@ -259,7 +262,7 @@ def create_app(data_root=None, enable_demo=True):
         if current['role']=='employer':
             rows=[j for j in rows if j['owner']==current['id']]
         else:
-            rows=[j for j in rows if j.get('status','published')=='published']
+            rows=[j for j in rows if active_job(j)]
         for job in rows:
             job['priorities'] = job.get('priorities', {r['skill']: '重点关注' for r in job['requirements']})
         return public_product(rows)
@@ -269,7 +272,9 @@ def create_app(data_root=None, enable_demo=True):
         role(current, ["employer"])
         companies=store.list('company_profile',current['id'])
         company=companies[0]['data'].get('name',current['name']) if companies else current['name']
-        data = {**payload.model_dump(), "company": company, "version": 1, "status":"published"}
+        data = {**payload.model_dump(), "company": company, "version": 1}
+        from backend.recruiting_workflow import validate_job_publish
+        validate_job_publish(data)
         ident = store.save("job", current["id"], data)
         with store.connect() as db:
             db.execute("INSERT INTO job_versions VALUES(?,?,?,?)", (ident, 1, encode(data), now()))
@@ -296,6 +301,9 @@ def create_app(data_root=None, enable_demo=True):
                     for key in ('weight', 'target'):
                         if key not in original.model_fields_set:
                             requirement[key] = previous[requirement['skill']][key]
+            from backend.recruiting_workflow import validate_job_capacity, validate_job_publish
+            validate_job_publish(data)
+            validate_job_capacity(db, ident, data['capacity'])
             db.execute("UPDATE entities SET data=?,updated=? WHERE id=?", (encode(data), now(), ident))
             db.execute("INSERT INTO job_versions VALUES(?,?,?,?)", (ident, data["version"], encode(data), now()))
             for application in db.execute("SELECT id,owner,data FROM entities WHERE kind='application'").fetchall():
@@ -375,7 +383,7 @@ def create_app(data_root=None, enable_demo=True):
     def apply(payload: s.Apply, current=Depends(user)):
         role(current, ["student"])
         target=entity(payload.job_id, "job")
-        if target['data'].get('status','published')!='published':
+        if not active_job(target['data']):
             raise HTTPException(409,'该岗位暂不接受新的投递')
         for doc_id in payload.document_ids:
             owned(doc_id, current, "document")
@@ -384,6 +392,9 @@ def create_app(data_root=None, enable_demo=True):
         ident, stamp = uid(), now()
         with store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            latest_target = db.execute("SELECT data FROM entities WHERE id=? AND kind='job'", (payload.job_id,)).fetchone()
+            if latest_target is None or not active_job(json.loads(latest_target['data'])):
+                raise HTTPException(409, '该岗位暂不接受新的投递')
             existing = db.execute("SELECT data FROM entities WHERE kind='application' AND owner=?", (current["id"],)).fetchall()
             if any(json.loads(row["data"])["job_id"] == payload.job_id and not json.loads(row["data"]).get("withdrawn") for row in existing):
                 raise HTTPException(409, "已投递该岗位")
@@ -459,7 +470,7 @@ def create_app(data_root=None, enable_demo=True):
             references = [qid for qid, q in questions.items() if q["skill"] == skill and qid in observation.evidence and item["data"].get("answers", {}).get(qid)]
             if not references:
                 raise HTTPException(422, "复核必须引用已作答且关联该能力的题目标识")
-        if set(payload.background) - {"majors", "schools", "languages"}:
+        if set(payload.background) - {"majors", "schools", "languages", "graduation_month", "degree", "academic_status"}:
             raise HTTPException(422, "未知背景条件")
         if any(payload.background.values()) and not item["data"].get("document_ids"):
             raise HTTPException(422, "核验背景需要学生授权的证明资料")
@@ -476,10 +487,15 @@ def create_app(data_root=None, enable_demo=True):
     def allocation(payload: s.Budget, current=Depends(user)):
         role(current, ["employer"])
         job_map = {j["id"]: flat(j) for j in store.list("job", current["id"]) if active_job(j['data'])}
+        reservations = [o['data'] for o in store.list('recruiting_offer')
+                        if o['data'].get('status') in {'accepted', 'hired'}]
+        reserved_students = {o['student_id'] for o in reservations}
+        for job_id, job in job_map.items():
+            job['capacity'] = max(0, job['capacity'] - sum(o['job_id'] == job_id for o in reservations))
         pairs = []
         for item in store.list("application"):
             job_id = item["data"]["job_id"]
-            if job_id in job_map and not item["data"].get("withdrawn") and item['data'].get('stage') != 'declined':
+            if job_id in job_map and item['owner'] not in reserved_students and not item["data"].get("withdrawn") and item['data'].get('stage') != 'declined':
                 result = application_result(item, entity(job_id, "job"))
                 pairs.append({"application_id": item["id"], "job_id": job_id, "student_id": item["owner"], "status": result["match"]["status"], "lower": result["match"]["lower"], "mutual": item["data"].get("student_chosen") and item["data"].get("employer_chosen")})
         return allocate(pairs, job_map, payload.model_dump())
@@ -718,6 +734,8 @@ def create_app(data_root=None, enable_demo=True):
     attach_company_logos(app)
     from backend.university_courses import attach_university_courses
     attach_university_courses(app, store, user)
+    from backend.university_workspace import attach_university_workspace
+    attach_university_workspace(app, store, user)
     from backend.university_intelligence import attach_university_intelligence
     attach_university_intelligence(app, store, user)
     from backend.university_report import attach_university_report

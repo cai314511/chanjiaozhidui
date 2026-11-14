@@ -139,12 +139,14 @@ def _courses(store, school_id):
     for course in courses:
         skills = course.get('skills') or mapping.get(course.get('id', course.get('code', '')))
         if not isinstance(skills, (list, dict)) or not skills:
-            return None
+            continue
+        if course.get('field_confirmations', {}).get('skills') is False:
+            continue
         names = {_canonical_skill(skill) for skill in skills if isinstance(skill, str) and skill.strip()}
         if not names:
-            return None
+            continue
         counts.update(names)
-    return counts
+    return counts if counts else None
 
 
 def _student_aggregates(store, school_id, available_tracks):
@@ -246,6 +248,10 @@ def attach_university_intelligence(app, store, user):
         available_tracks.discard('')
         student_count, abilities, goals = _student_aggregates(store, current['id'], available_tracks)
         course_counts = _courses(store, current['id'])
+        catalogs = store.list('university_course_catalog', current['id'])
+        catalog_courses = catalogs[0]['data'].get('courses', []) if catalogs else []
+        mapped = sum(bool(c.get('skills')) and c.get('field_confirmations', {}).get('skills') is not False for c in catalog_courses)
+        pending = len(catalog_courses) - mapped
         skill_names = set(historical) | set(live_skills) | {skill for skill, values in abilities.items() if len(values) >= MINIMUM_STUDENTS}
         skills = []
         for skill in skill_names:
@@ -266,7 +272,9 @@ def attach_university_intelligence(app, store, user):
             'trend': [{'month': month, 'postings': count} for month, count in sorted(trend.items())],
             'sectors': [{'name': name, 'postings': count} for name, count in sectors.most_common()], 'skills': skills,
             'student_goals': [{'name': name, 'count': count} for name, count in goals.most_common()],
-            'coverage': [{'skill': row['name'], 'course_count': course_counts[row['name']] if course_counts is not None else None} for row in skills],
+            'coverage_summary': {'total_courses': len(catalog_courses), 'mapped_courses': mapped, 'pending_courses': pending, 'partial': pending > 0},
+            'coverage': [{'skill': row['name'], 'course_count': course_counts[row['name']] if course_counts is not None else None,
+                          'at_least': pending > 0, 'pending_courses': pending} for row in skills],
             'links': [{'source': '赛道：' + sector, 'target': '技能：' + skill, 'value': count} for (sector, skill), count in links.most_common()],
             'notes': ['历史需求来自已导入招聘CSV全量去重统计，实际期间见历史观察期；未使用企业近期样本推算市场。',
                 '历史赛道参考关联上市公司行业及同名招聘主体证据，不认定发布法人行业或工商行业编码。',
@@ -276,4 +284,4 @@ def attach_university_intelligence(app, store, user):
                 '学生统计仅包含school_id关联本校的学生账号；总样本或单技能、单目标不足5人时抑制对应数据。学生自述能力不代表全校总体。',
                 '赛道和城市筛选历史公告及站内岗位，本校匿名学生汇总保持全校授权样本口径。',
                 '能力差值为岗位目标等级减本校能力均值的非负差，仅双方均有数据且该技能本校至少5样本时计算，不是市场绝对缺员人数。',
-                '课程覆盖仅据本校显式课程技能映射计算；缺课程或映射时为null，未用课程标题猜测覆盖。']}
+                '课程覆盖仅据本校已确认的显式课程技能映射计算；部分映射显示已确认的至少课程数及待映射数量，未用课程标题猜测覆盖。']}

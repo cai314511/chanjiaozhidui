@@ -32,3 +32,9 @@
 @media(prefers-reduced-motion:reduce){.role-mascot-stage *,.mascot-entry-art{animation:none!important;transition:none!important}.mascot-arrival{transform:none}}
 @media(max-width:1200px){.discovery-hero.has-role-mascot{padding-right:250px}.discovery-hero.has-role-mascot .role-mascot-stage{width:224px;height:226px}}
 @media(max-width:760px){.discovery-hero.has-role-mascot{padding:184px 0 28px;min-height:0}.discovery-hero.has-role-mascot .role-mascot-stage{width:165px;height:167px;top:6px;right:0;transform:none}.discovery-hero.has-role-mascot>.eyebrow{position:absolute;left:0;top:45px;max-width:calc(100% - 180px);line-height:2}}
+/* 报告右侧留出独立安全栏，小入口始终可点且不覆盖图文。 */
+body:has(#university-report) #app{margin-right:64px}
+body:has(#university-report) #agent-toggle{position:fixed;left:auto;top:auto;right:10px;bottom:18px;display:grid;place-items:center;width:44px;height:44px;margin:0;padding:0;border:1px solid #9ab9a0;border-radius:12px;background:#f6fbf3;box-shadow:none;overflow:hidden}
+body:has(#university-report) #agent-toggle .mascot-entry-art{display:none}
+body:has(#university-report) #agent-toggle .mascot-entry-label{display:none}
+body:has(#university-report) #agent-toggle:after{content:'AI';font-size:14px;color:#315f4d}

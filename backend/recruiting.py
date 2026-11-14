@@ -28,6 +28,9 @@ class Stage(Model):
 
 
 def attach_recruiting(app, store, user, flat, application_result):
+    from backend.recruiting_workflow import attach_recruiting_workflow, close_job_workflow
+    from backend.eligibility import qualification, validate_job_publish
+    attach_recruiting_workflow(app, store, user, application_result)
     def employer(current):
         if current['role'] != 'employer':
             raise HTTPException(403, '仅企业账号可管理招聘')
@@ -46,8 +49,24 @@ def attach_recruiting(app, store, user, flat, application_result):
     def favorite_id(owner, student):
         return 'candidate-star-' + hashlib.sha256((owner+':'+student).encode()).hexdigest()
 
+    @app.get('/api/recruiting/job-qualifications')
+    def job_qualifications(current=Depends(user)):
+        if current['role'] != 'student':
+            raise HTTPException(403, '仅学生可查看自己的岗位资格')
+        profiles = store.list('profile', current['id'])
+        profile = profiles[0]['data'] if profiles else {}
+        result = {}
+        for job in store.list('job'):
+            from backend.job_state import active_job
+            if not active_job(job['data']):
+                continue
+            reviews = [(a['data'].get('review') or {}).get('background', {}) for a in store.list('application', current['id']) if a['data']['job_id'] == job['id'] and not a['data'].get('withdrawn')]
+            background = {key: value for review in reviews for key, value in review.items()}
+            result[job['id']] = qualification(job['data'], profile, background)
+        return result
+
     @app.get('/api/recruiting/candidates')
-    def candidates(current=Depends(user)):
+    def candidates(qualification_status: str = '', current=Depends(user)):
         employer(current)
         grouped = {}
         for item in active_applications(current['id']):
@@ -60,9 +79,13 @@ def attach_recruiting(app, store, user, flat, application_result):
                                 'favorite': bool(store.get(favorite_id(current['id'],sid), 'candidate_favorite')), 'applications': []}
             job = store.get(item['data']['job_id'], 'job')
             result = application_result(item, job)
+            profile_rows = store.list('profile', sid)
+            qualification_result = qualification(job['data'], profile_rows[0]['data'] if profile_rows else {}, (item['data'].get('review') or {}).get('background', {}))
+            if qualification_status and qualification_result['status'] != qualification_status:
+                continue
             grouped[sid]['applications'].append({'id':item['id'],'job_id':job['id'],'title':job['data']['title'],
-                'stage':item['data'].get('stage','new'), 'match':public_product(result['match']), 'created':item['created']})
-        return list(grouped.values())
+                'stage':item['data'].get('stage','new'), 'match':public_product(result['match']), 'qualification':qualification_result, 'created':item['created']})
+        return [c for c in grouped.values() if c['applications']]
 
     @app.get('/api/recruiting/candidates/{student_id}')
     def candidate(student_id: str, current=Depends(user)):
@@ -110,7 +133,10 @@ def attach_recruiting(app, store, user, flat, application_result):
             row=db.execute("SELECT * FROM entities WHERE id=? AND kind='job'",(ident,)).fetchone()
             if row is None or row['owner']!=current['id']:
                 raise HTTPException(403,'只能管理本公司的岗位')
-            data=json.loads(row['data']);data['status']=payload.status
+            data=json.loads(row['data'])
+            if payload.status == 'published': validate_job_publish({**data, 'status': 'published'})
+            if payload.status == 'closed': close_job_workflow(db, ident)
+            data['status']=payload.status
             db.execute('UPDATE entities SET data=?,updated=? WHERE id=?',(encode(data),now(),ident))
         return {'id':ident,'status':payload.status}
 

@@ -1,10 +1,22 @@
-import {state,api,e,heading,button,on,navigate,closeDialog} from './core.js';
+import {state,api,e,heading,button,on,navigate,closeDialog,dialog,post} from './core.js';
 import {universityChartLibrary} from './university-intelligence.js';
+import {exportUniversityReport} from './university-report-export.js';
 
 let prepared=null,active=null;
 let reportReference=null;
 export function selectUniversityReport(kind,id){reportReference={kind,id,owner:state.user.id,epoch:state.sessionEpoch};}
 on('university-selected-report',el=>{selectUniversityReport(el.dataset.kind||'run_id',el.dataset.id);closeDialog();navigate('university');});
+on('report-export',()=>{if(active)exportUniversityReport(active);});
+on('report-recalculate',()=>{
+ if(!prepared)return;
+ const data=prepared.data;
+ dialog('确认输入变更后重新测算',`<p>当前报告将保留原始输入和结果。确认后，使用当前方案与证据生成新的测算记录。</p><ul>${data.version_check.changes.map(change=>`<li>${e(change.label)}已更新</li>`).join('')}</ul><div class="inline">${button('确认并生成新测算','report-confirm-recalculate','','primary')}${button('返回原报告','close-modal')}</div>`);
+});
+on('report-confirm-recalculate',async()=>{
+ const data=prepared?.data;if(!data)return;
+ const result=await post('/university/report/recalculate',{run_id:data.source.run_id,versions_token:data.version_check.token,confirmed:true});
+ selectUniversityReport('run_id',result.id);closeDialog();navigate('university');
+});
 const colors={before:'#9caeaa',after:'#217d70',target:'#b9934e',pessimistic:'#b87969'};
 const amount=(value,digits=1)=>value==null?'待补充':Number(value).toLocaleString('zh-CN',{maximumFractionDigits:digits});
 
@@ -33,21 +45,32 @@ function chartCard(id,kicker,title,description,extra='',details=''){
 function courseText(course,all){
  return `<div class="report-course-line"><strong>${e(course.name)}</strong><span>${amount(course.credits)} 学分 · ${amount(course.hours)} 学时</span><small>先修：${(course.prerequisites||[]).map(id=>e(all.find(c=>c.id===id)?.name||id)).join('、')||'未设置'}</small></div>`;
 }
+function confirmedPlans(action){
+ const unique=new Map([action.teaching_plan,...action.added.map(c=>c.teaching_plan)].filter(plan=>plan?.confirmed).map(plan=>[JSON.stringify(plan),plan]));
+ return [...unique.values()];
+}
 function teachingModules(action){
- const hours=action.added.reduce((sum,course)=>sum+(course.hours||0),0);
- if(!hours)return '';
- const skills=Object.keys(action.skill_delta),focus=skills.join('、')||'课程目标能力';
- const practices=skills.map(name=>{
-  if(/SQL|数据库/i.test(name))return '建立数据表、编写查询并核对结果';
-  if(/Python|编程|程序/i.test(name))return '完成可运行代码、数据处理脚本与错误检查';
-  if(/数据|统计|计量/.test(name))return '完成数据清洗、统计分析与可视化解释';
-  if(/产品|设计/.test(name))return '整理需求、绘制原型并记录用户测试反馈';
-  if(/沟通|协作|团队/.test(name))return '安排团队分工、评审汇报与协作复盘';
-  return `完成${name}的操作练习并保留过程证据`;
- });
- const a=Math.floor(hours*.125),b=Math.floor(hours*.25),c=Math.floor(hours*.375),d=hours-a-b-c;
- const modules=[['方法与基础',a,`明确${focus}的目标和评价标准，开展课前任务，识别现有能力起点。`],['分项训练',b,practices.join('；')+'。'],['综合项目',c,`围绕相关岗位设计完整任务，将${focus}连接到一份可展示的作品或研究报告。`],['评审与改进',d,'提交作品、过程记录和个人贡献说明，完成答辩与一次修订，按相同标准复测。']];
- return `<div class="report-module-plan"><div class="report-module-heading"><h5>建议教学模块</h5><small>新增模块合计 ${amount(hours)} 学时 · 供任课教师确认</small></div><div>${modules.map(([name,value,text])=>`<section><span>${amount(value)} 学时</span><h6>${name}</h6><p>${e(text)}</p></section>`).join('')}</div></div>`;
+ const plans=confirmedPlans(action);
+ if(!plans.length)return '<p class="report-description">教学安排待补：请由任课教师确认原模块、新模块、实施学期、项目考核与投入；未确认内容不分配学时。</p>';
+ return plans.map(plan=>`<div class="report-module-plan"><div class="report-module-heading"><h5>已确认教学安排</h5><small>开课学期：${e(plan.semester||'待补充')}</small></div><p>原模块：${e((plan.old_modules||[]).map(module=>typeof module==='string'?module:module.name).join('、')||'待补充')}；先修：${e((Array.isArray(plan.prerequisites)?plan.prerequisites.join('、'):plan.prerequisites)||'待补充')}</p><div>${(plan.modules||[]).map(module=>`<section><span>${amount(module.hours)} 学时</span><h6>${e(module.name)}</h6><p>考核：${e(module.assessment||'待补充')}</p></section>`).join('')}</div><p>实践项目：${e(plan.project||'待补充')}；投入说明：${e(plan.investment_notes||'待补充')}</p></div>`).join('');
+}
+
+function roadmap(data){
+ const plans=data.actions.flatMap(confirmedPlans);
+ const timeline=plans.flatMap(plan=>plan.timeline||[]);
+ return `<details class="report-panel report-roadmap"><summary>已确认实施路径</summary>${timeline.length?`<div class="report-roadmap-grid">${timeline.map(step=>`<article><small>${e(step.year)}</small><h4>${e(step.title)}</h4><p>${e(step.detail)}</p></article>`).join('')}</div>`:'<p>待补充已确认的实施学期、项目里程碑与验收安排。</p>'}</details>`;
+}
+
+function versionNotice(data){
+ const check=data.version_check;
+ if(!check)return '';
+ const needsWorkspace=data.source.optimization_id||check.changes.some(change=>['catalog','profile','workspace'].includes(change.id));
+ return `<section class="report-version ${check.stale?'is-stale':''}" aria-label="报告快照版本"><strong>${check.stale?'输入已更新，本报告保留历史快照':'当前展示已保存的证据快照'}</strong>${check.changes.length?`<p>${check.changes.map(change=>e(change.label)).join('、')}与测算时不同。</p>${needsWorkspace?'<p>请在向导核对变化并确认新方案，旧测算不会自动纳入变更。</p>'+button('前往向导确认并重新测算','route','university-workspace','primary'):button('查看差异并重新测算','report-recalculate','','primary')}`:''}${check.unknown.map(text=>`<p>${e(text)}</p>`).join('')}</section>`;
+}
+
+function constraintDetails(data){
+ if(!data.constraint_checks?.length)return '';
+ return `<details class="report-panel report-constraints" ${data.calculation.state==='infeasible'?'open':''}><summary>约束诊断 · 候选检查，不作为推荐</summary>${data.constraint_checks.map(row=>`<article><h4>${e(row.name)}</h4><p>${row.violations.map(e).join('；')||'该候选单独校验通过；组合改善见本轮测算结果。'}</p><ul>${row.resources.filter(resource=>resource.shortfall>0).map(resource=>`<li>${e(resource.label)}：需 ${amount(resource.used)} ${e(resource.unit)}，上限 ${amount(resource.limit)}，差额 ${amount(resource.shortfall)} ${e(resource.unit)}</li>`).join('')}</ul></article>`).join('')}</details>`;
 }
 function recommendations(data){
  if(!data.actions.length){
@@ -58,7 +81,7 @@ function recommendations(data){
   const kinds={add:'新增课程',modify:'重构课程',delete:'精简课程',merge:'整合课程'};
   const courses=[...(action.removed||[]),...(action.added||[])];
   const beforeCourses=action.removed.map(c=>courseText(c,data.courses_before)).join('')||`<p class="report-description">${data.source.optimization_id?'原课程结构尚未登记':'当前课程结构中无该新增模块'}</p>`;
-  return `<article class="report-action"><div class="report-action-head"><span class="report-action-number">${String(index+1).padStart(2,'0')}</span><div><span class="report-kicker">${e(kinds[action.kind]||'课程调整')} · ${e(action.status)}</span><h4>${e((action.added||[]).map(c=>c.name).join('、')||(action.removed||[]).map(c=>c.name).join('、'))}</h4></div><span class="report-cost">¥ ${amount(action.cost,0)}</span></div><p>${e(action.reason)}</p><div class="report-action-columns"><div><span class="report-label">调整前</span>${beforeCourses}</div><div><span class="report-label accent">调整后</span>${action.added.map(c=>courseText(c,[...data.courses_before,...data.courses_after,...courses])).join('')||'<p class="report-description">移除后将学习时间重新分配至保留课程</p>'}</div></div><div class="report-gain-list">${Object.entries(action.skill_delta).map(([name,value])=>`<span>${e(name)} <b>${value>0?'+':''}${amount(value)} 级</b></span>`).join('')}</div>${teachingModules(action)}<div class="report-teaching"><div><h5>怎么实施</h5><p>第一学年完成课程大纲、先修检查与师资安排；第二学年小班试行，使用同一评分标准记录课前和课后表现；第三学年纳入方向项目与企业任务；第四学年结合毕业去向复盘。</p></div><div><h5>怎么验收</h5><p>围绕${e(Object.keys(action.skill_delta).join('、')||'课程学习目标')}设置可提交的项目作品、过程记录与答辩。任课教师核对能力等级，专业负责人核对学分学时与实际投入。</p></div></div><details><summary>查看能力增益依据与实施条件</summary><p>${e(action.evidence)}</p><p>以上能力增益为方案输入，按课程考核更新。正式实施前由本校确认教学大纲、开课学期、预算与师资安排。</p></details></article>`;
+  return `<article class="report-action"><div class="report-action-head"><span class="report-action-number">${String(index+1).padStart(2,'0')}</span><div><span class="report-kicker">${e(kinds[action.kind]||'课程调整')} · ${e(action.status)}</span><h4>${e((action.added||[]).map(c=>c.name).join('、')||(action.removed||[]).map(c=>c.name).join('、'))}</h4></div><span class="report-cost">¥ ${amount(action.cost,0)}</span></div><p>${e(action.reason)}</p><div class="report-action-columns"><div><span class="report-label">调整前</span>${beforeCourses}</div><div><span class="report-label accent">调整后</span>${action.added.map(c=>courseText(c,[...data.courses_before,...data.courses_after,...courses])).join('')||'<p class="report-description">移除后的课程安排待本校确认</p>'}</div></div><div class="report-gain-list">${Object.entries(action.skill_delta).map(([name,value])=>`<span>${e(name)} <b>${value>0?'+':''}${amount(value)} 级</b></span>`).join('')}</div>${teachingModules(action)}<details><summary>查看能力增益依据与实施条件</summary><p>${e(action.evidence)}</p><p>以上能力增益为方案输入，按课程考核更新。正式实施前由本校确认教学大纲、开课学期、预算与师资安排。</p></details></article>`;
  }).join('')}</div>`;
 }
 function yearTable(scenario){
@@ -77,18 +100,22 @@ export async function universityReportPage(){
  const data=await api('/university/report'+(reference?'?'+new URLSearchParams({[reference.kind]:reference.id}):''));
  if(epoch!==state.sessionEpoch)return '';
  prepared={data,epoch};
+ if(!reference&&(data.source.run_id||data.source.optimization_id))selectUniversityReport(data.source.run_id?'run_id':'optimization_id',data.source.run_id||data.source.optimization_id);
  const base=data.scenarios.find(s=>s.name==='基准'),match=data.metrics.find(m=>m.id==='match');
  const improvement=match.before!=null&&match.after!=null?match.after-match.before:null;
  const mainAction=data.actions[0];
  const simple=Boolean(data.source.optimization_id);
  const cost=data.resources.find(r=>r.id==='cost');
- const conclusion=simple?`本轮选中 ${data.actions.length} 项培养方案 · 新增投入 ${amount(cost?.after,0)} 元`:improvement!=null?`基准方案匹配度可提升 ${amount(improvement)} 个百分点`:mainAction?'从课程实践着手，补齐培养与岗位之间的连接':'先连接课程、学生与岗位，形成培养判断';
+ const conclusion=data.calculation.label;
+ const adjustment=mainAction?mainAction.added.map(course=>course.name).join('、')||mainAction.reason:'先补齐课程与岗位目标，再确认候选动作';
  const totalCredits=data.courses_before.length?data.courses_before.reduce((n,c)=>n+(c.credits||0),0):null;
  const totalHours=data.courses_before.length&&data.courses_before.every(c=>c.hours!=null)?data.courses_before.reduce((n,c)=>n+c.hours,0):null;
  const skillSummary=`<details><summary>学生能力汇总 · ${data.student_skills.length} 项</summary>${data.student_skills.length?`<div class="table-wrap"><table><thead><tr><th>技能</th><th>本校等级均值</th><th>样本数</th></tr></thead><tbody>${data.student_skills.map(s=>`<tr><td>${e(s.name)}</td><td>${amount(s.level,2)}</td><td>${s.count}</td></tr>`).join('')}</tbody></table></div><p>没有岗位目标等级时，仍保留本校能力证据，匹配度与覆盖度等待可比较的目标。</p>`:'<p>等待每项技能至少5名本校学生提供记录。</p>'}</details>`;
  return `<div class="university-report" id="university-report">
- ${heading('高校培养诊断','将证据、培养调整和四年情景，整理成一份可阅读的报告。',button('更新报告','reload','','small'))}
- <section class="report-hero"><div class="report-hero-copy"><span class="report-kicker">培养诊断报告 / 四年培养周期</span><div class="report-status"><i></i>${data.feasible?'方案已通过资源约束测算':'依据当前已接入资料诊断'}</div><h2>${conclusion}</h2><p>${e(data.program?.name||state.user.name+'培养方案')} ${data.program?'· '+e(data.program.region):''}</p><p class="report-hero-detail">${mainAction?'优先行动：'+e(mainAction.reason):'导入本校课表，建立课程库，再结合本专业岗位目标与能力证据制定调整方案。'}</p><div class="inline">${button('导入全校课表','university-import','teaching','primary')}${button('查看课程库','university-course-library')}${button('调整方案与假设','route','decision')}</div></div><div class="report-cycle" aria-label="四年培养闭环"><div class="report-cycle-inner"><small>培养与反馈</small><strong>4<span>年</span></strong><p>课程 · 实践 · 毕业跟踪</p></div><span class="report-orbit a">课程重构</span><span class="report-orbit b">岗位连接</span><span class="report-orbit c">结果复盘</span></div></section>
+ ${heading('高校培养诊断','阅读结论、重点课程调整与资源投入。',button('导出图文报告 / PDF','report-export','','primary')+button('刷新快照状态','reload','','small'))}
+ <section class="report-hero"><div class="report-hero-copy"><span class="report-kicker">培养诊断报告 / 四年培养周期</span><div class="report-status" data-calculation-state="${e(data.calculation.state)}"><i></i>${e(data.calculation.label)}</div><h2>${e(conclusion)}</h2><p>${e(data.program?.name||state.user.name+'培养方案')} ${data.program?'· '+e(data.program.region):''}</p><p class="report-hero-detail">${e(data.calculation.reason)}</p>${data.calculation.missing.length?`<p>待补：${data.calculation.missing.map(e).join('；')}</p>`:''}<div class="inline">${button('确认培养方案','route','university-workspace','primary')}${button('查看课程库','university-course-library')}${button('高级方案与假设','route','decision')}</div></div><div class="report-cycle" aria-label="四年培养闭环"><div class="report-cycle-inner"><small>培养与反馈</small><strong>4<span>年</span></strong><p>课程 · 实践 · 毕业跟踪</p></div></div></section>
+ <section class="report-executive" aria-label="本轮三项结论"><article><span>培养改善</span><strong>${improvement!=null?amount(improvement)+' 个百分点':simple&&data.actions.length?'已降低录入技能缺口':'等待可比较的改善依据'}</strong><p>${simple?'技能增益以本轮确认假设为准':'基准情景专业与岗位匹配变化'}</p></article><article><span>重点调整</span><strong>${e(adjustment)}</strong><p>${data.actions.length} 项已选培养动作</p></article><article><span>预算与资源</span><strong>${cost?.after!=null?'新增 '+amount(cost.after,0)+' 元':'新增投入待测算'}</strong><p>预算上限 ${amount(cost?.limit,0)} 元；师资与实验室约束见下方</p></article></section>
+ ${versionNotice(data)}${constraintDetails(data)}
  <div class="report-source-strip" data-report-reference="${e(data.source.run_id||data.source.optimization_id||'')}"><span>${e(data.source.title||data.metrics_scope)}</span><span>${data.source.created_at?'测算于 '+e(new Date(data.source.created_at).toLocaleString('zh-CN')):'本次读取 '+e(data.generated_at.slice(0,10))}</span><span>${data.program?'当前招生 '+data.program.current_seats+' 人':'尚未登记本专业招生规模'}</span><span>全校课程库 ${amount(data.catalog.total,0)} 门</span></div>
  ${simple?`<section class="report-panel"><h3>本轮资源优化结果</h3><p>已使用预算 ${amount(cost.after,0)} / ${amount(cost.limit,0)} 元；${data.actions.length?'选中课程：'+e(data.actions.flatMap(a=>a.added.map(c=>c.name)).join('、')):'当前资源条件下未选中正收益组合'}。</p><div class="report-gain-list">${data.skills.map(s=>`<span>${e(s.name)} 缺口：${amount(s.gap_before)} → ${amount(s.gap_after)} 级</span>`).join('')}</div><p>以上为录入增益假设下的缺口变化。原专业课程、能力基线与课程总学时未提供，保持待补充。</p></section>`:''}
  <div class="report-section-title"><div><span class="report-kicker">01 / 评价总览</span><h3>五个维度，先看调整带来什么</h3></div><span class="report-description">当前依据 → 方案测算</span></div>
@@ -100,7 +127,7 @@ export async function universityReportPage(){
  <div class="report-chart-grid">${chartCard('skills','能力结构 / 0—5级','把能力缺口看清楚','对照岗位目标、本校能力与调整方案。技能增益按课程方案假设计算。','',skillSummary)}${chartCard('resources','资源投入 / 约束内调整','让改善与投入一起被看见','条形表示占已登记资源上限的比例，悬停查看金额或课时。')}</div>
  <div class="report-section-title"><div><span class="report-kicker">03 / 课程与培养行动</span><h3>把诊断落到具体课程和教学安排</h3></div><span class="report-description">${data.actions.length} 项${data.feasible?'已测算课程动作':'待确认培养建议'}</span></div>
  ${recommendations(data)}
- <section class="report-panel report-roadmap"><span class="report-kicker">04 / 四年实施路径</span><h3>从课程试行到毕业反馈，逐年推进</h3><div class="report-roadmap-grid">${[['01','第一学年','课程准备','核对岗位与课程映射，确定先修、教学大纲、预算和师资，建立能力基线。'],['02','第二学年','小班试行','开展课程项目与阶段考核，记录实际课时和资源支出，按学生意愿推进方向分流。'],['03','第三学年','实践衔接','将课程成果转入校企项目与实习任务，按企业反馈调整项目难度和技能训练。'],['04','第四学年','毕业复盘','跟踪毕业去向、专业对口就业和实施成本，将实际结果回填下一轮培养调整。']].map(([n,year,title,text])=>`<article><span>${n}</span><small>${year}</small><h4>${title}</h4><p>${text}</p></article>`).join('')}</div></section>
+ ${roadmap(data)}
  <section class="report-panel report-catalog"><div><span class="report-kicker">全校课程资产 / 与单专业方案分别管理</span><h3>${amount(data.catalog.total,0)} 门课程已进入本校课程库</h3><p>已确认技能映射 ${amount(data.catalog.mapped,0)} 门 · 未提供学时 ${amount(data.catalog.missing_hours,0)} 门。课表未提供的字段保持空缺。</p></div><div class="inline">${button('导入课程','university-import','teaching')}${button('浏览与搜索','university-course-library')}<a class="btn" href="/api/university/courses/export">导出课程 XLSX</a></div></section>
  <details class="report-panel report-method"><summary>课程明细、数据来源与测算依据</summary><p>${e(data.source.title||'当前岗位与本校授权学生汇总')} · ${e(data.source.assumptions||'尚未设置四年情景参数。')}</p><p>${simple?'本专业原方案课程数量、学分与总学时尚未登记':`本专业原方案 ${data.courses_before.length} 门课程，${amount(totalCredits)} 学分、${amount(totalHours)} 学时`}；全校课程库按导入文件另行归并，不直接计入本专业方案。</p><div class="table-wrap"><table><thead><tr><th>原方案课程</th><th>学分</th><th>学时</th><th>调整后状态</th></tr></thead><tbody>${data.courses_before.map(c=>`<tr><td>${e(c.name)}</td><td>${c.credits}</td><td>${c.hours}</td><td>${data.courses_after.length?(data.courses_after.some(a=>a.id===c.id)?'保留 / 更新':'移除 / 整合'):'尚未测算'}</td></tr>`).join('')}</tbody></table></div>${data.source.provenance.map(p=>`<p><strong>${e(p.source?.title||'已登记来源')}</strong> · ${e(p.source?.scope||'')}<small class="hash">${e(p.sha256||'')}</small></p>`).join('')}<p>能力汇总遵守至少5人展示规则。课程收益、需求增长与资源容量使用已登记假设；专业对口率的调整后数值等待毕业跟踪。所有图表使用本地 ECharts Canvas。</p>${data.source.run_id?`<a class="btn small" href="/api/competition/runs/${encodeURIComponent(data.source.run_id)}/export?format=md">导出测算报告正文</a>`:''}<p class="report-school-code">本校入校码：${e(state.user.school_code||'')} · 学生自愿填写后加入本校汇总。</p></details>
  </div>`;
@@ -166,6 +193,11 @@ function updateScenario(controller,name){
  controller.root.querySelector('#report-metrics').innerHTML=metricCards(controller.data,scenario);
  controller.root.querySelector('#report-scenario-summary').innerHTML=scenarioSummary(controller.data,scenario);
  controller.root.querySelector('#report-year-table').innerHTML=yearTable(scenario);
+ const last=scenario.years.at(-1);
+ if(last?.match_before!=null&&last.match_after!=null){
+  controller.root.querySelector('.report-executive article:first-child strong').textContent=amount(last.match_after-last.match_before)+' 个百分点';
+  controller.root.querySelector('.report-executive article:first-child p').textContent=name+'情景专业与岗位匹配变化';
+ }
  drawForecast(controller);drawSkills(controller);
 }
 export async function bindUniversityReport(){

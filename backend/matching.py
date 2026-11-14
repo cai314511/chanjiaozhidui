@@ -102,7 +102,8 @@ def hard_gates(job, profile, abilities, verified_background=None):
         gates.append({"label": "学生薪资底线", "status": "pass" if job["salary_max"] >= prefs.get("salary_target", 0) else "fail"})
     if prefs.get("city_hard") and prefs.get("cities"):
         gates.append({"label": "学生城市要求", "status": "pass" if job["city"] in prefs["cities"] else "fail"})
-    return gates
+    from backend.eligibility import qualification
+    return gates + qualification(job, profile, background)['checks']
 
 
 def match(job, profile, assessments=None):

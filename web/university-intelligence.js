@@ -89,6 +89,8 @@ async function paint(controller,data){
  if(levels.length>=3)chart(controller,echarts,'radar',{tooltip:{trigger:'item',renderMode:'richText'},legend:{bottom:0,textStyle:{color:'#557568'}},radar:{radius:'62%',center:['50%','47%'],indicator:levels.map(row=>({name:row.name,max:5})),axisName:{color:'#426b59',fontSize:11},splitArea:{areaStyle:{color:['rgba(36,123,105,.02)','rgba(36,123,105,.055)']}}},series:[{type:'radar',symbolSize:5,data:[{name:'岗位能力目标',value:levels.map(row=>row.target_level),areaStyle:{opacity:.1}},{name:'本校能力均值',value:levels.map(row=>row.student_level),areaStyle:{opacity:.17}}]}]});
  else noData(host('radar'),'本校能力证据尚未形成可比维度','需要至少3个同时具备真实岗位能力目标和足够本校学生样本的技能维度。缺失等级不绘制为零。');
  const coverage=(data.coverage||[]).filter(row=>Number.isFinite(row.course_count)).slice(0,12).reverse();
+ const coverageHeading=host('coverage').parentElement.querySelector('.intel-chart-heading p');
+ if(data.coverage_summary?.partial)coverageHeading.textContent=`已确认映射 ${data.coverage_summary.mapped_courses} 门；还有 ${data.coverage_summary.pending_courses} 门待映射。柱形表示已确认至少覆盖的课程数。`;
  if(coverage.length)chart(controller,echarts,'coverage',{xAxis:{...axis('value'),minInterval:1,name:'课程数'},yAxis:{...axis(),data:coverage.map(row=>row.skill),axisLabel:{...axis().axisLabel,width:85,overflow:'truncate'}},series:[{name:'映射课程',type:'bar',barMaxWidth:22,itemStyle:{color:'#71af9d',borderRadius:5},data:coverage.map(row=>row.course_count)}]});
  else noData(host('coverage'),'尚未接入课程与技能映射','导入本校课程并核对技能映射后，这里展示已有课程覆盖。');
  const links=(data.links||[]).filter(link=>link.value>0).slice(0,65),nodes=[...new Set(links.flatMap(link=>[link.source,link.target]))];

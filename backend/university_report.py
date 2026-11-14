@@ -1,12 +1,15 @@
 """本校培养诊断的报告视图；复用已保存的决策结果，不补造预测。"""
 from collections import defaultdict
+import copy
 
 from fastapi import Depends, HTTPException
+from pydantic import BaseModel
 
 from backend.competition_api import public_result
-from backend.decision import changed_skills, structural_score, validate_program
+from backend.decision import changed_skills, structural_score, validate_program, run_decision
 from backend.store import now
 from backend.job_state import active_job
+from backend.university_report_metadata import check_report_versions, report_source_versions
 
 
 SCENARIOS = [
@@ -30,6 +33,45 @@ def owned_result(store, owner, ident, kind):
     if item['owner'] != owner:
         raise HTTPException(403, '仅可读取本校测算记录')
     return item
+
+
+def constraint_checks(program, actions):
+    """候选只供定位冲突，按真实课程校验给出超限差额。"""
+    rows = []
+    if not program:
+        return rows
+    for action in actions:
+        check = validate_program(program, [action])
+        resources = []
+        for key, limit, label, unit in [('cost', 'budget', '调整预算', '元'),
+                                       ('teacher_hours', 'teacher_hours_max', '师资课时', '课时'),
+                                       ('lab_hours', 'lab_hours_max', '实验室课时', '课时')]:
+            used, maximum = check['totals'][key], program['constraints'][limit]
+            resources.append({'id': key, 'label': label, 'used': used, 'limit': maximum,
+                              'unit': unit, 'shortfall': max(0, used - maximum)})
+        rows.append({'action_id': action['id'], 'name': action.get('reason', action['id']),
+                     'feasible': check['feasible'], 'violations': check['violations'], 'resources': resources})
+    return rows
+
+
+def calculation_state(run, result, checks):
+    if not run:
+        return {'state': 'not_calculated', 'label': '尚未测算', 'missing': [],
+                'reason': '连接课程、岗位目标与资源上限后，确认并生成一次测算。'}
+    if result.get('best'):
+        if result.get('status') == 'partial':
+            return {'state': 'missing_inputs', 'label': '课程方案可行，预测输入待补',
+                    'missing': [result['best']['forecast'].get('reason', '四年情景输入待补')],
+                    'reason': '已保存通过课程约束的改善方案；四年结果需补齐预测依据。'}
+        return {'state': 'success', 'label': '已找到可行改善方案', 'missing': [],
+                'reason': '所列推荐已通过本轮培养方案约束，并产生正向技能结构改善。'}
+    if result.get('status') == 'incomplete':
+        return {'state': 'missing_inputs', 'label': '测算输入待补', 'missing': result.get('missing', []),
+                'reason': '缺少可比较的岗位目标或能力证据，尚未生成推荐。'}
+    infeasible = not result.get('rounds') or all(not row['program']['feasible'] for row in result.get('rounds', []))
+    return {'state': 'infeasible' if infeasible else 'no_improvement',
+            'label': '当前约束下无可行方案' if infeasible else '当前候选未产生改善', 'missing': [],
+            'reason': '检查下列真实约束冲突并调整资源或课程。' if infeasible else '保留原方案；修改候选课程与已确认增益后重新测算。'}
 
 
 def build_report(store, owner, run_id=None, optimization_id=None):
@@ -132,22 +174,21 @@ def build_report(store, owner, run_id=None, optimization_id=None):
                               'after': adjusted['totals'][key] if adjusted else None,
                               'limit': program['constraints'][limit]})
     catalogs = store.list('university_course_catalog', owner)
-    catalog = catalogs[0]['data'] if catalogs else {'courses': [], 'sources': []}
+    catalog = (run['data'].get('catalog_snapshot') if run else None) or (catalogs[0]['data'] if catalogs else {'courses': [], 'sources': []})
     departments = defaultdict(int)
     for course in catalog['courses']:
         for department in course.get('departments', []) or ['未注明院系']:
             departments[department] += 1
-    actions = adjusted['changes'] if adjusted else [
-        {'action_id': action['id'], 'kind': action['kind'], 'reason': action['reason'],
-         'removed': [c for c in program['courses'] if c['id'] in action['remove_ids']],
-         'added': action['add_courses'], 'evidence': action['evidence']} for action in proposals
-    ]
+    checks = constraint_checks(program, proposals) if run and not best else []
+    actions = copy.deepcopy(adjusted['changes']) if adjusted else []
     for action in actions:
         original = next((a for a in proposals if a['id'] == action['action_id']), {})
         action.update({'cost': original.get('cost'), 'skill_delta': original.get('skill_delta', {}),
-                       'status': '已通过约束测算' if best else '待测算候选建议'})
+                       'status': '已通过约束测算', 'teaching_plan': original.get('teaching_plan')})
     return public_result({
         'generated_at': now(), 'program': program, 'metrics': metrics,
+        'calculation': calculation_state(run, result, checks), 'constraint_checks': checks,
+        'version_check': check_report_versions(store, owner, run) if run else {'stale': False, 'changes': [], 'unknown': [], 'token': None},
         'student_skills': [{'name': name, 'level': observation['level'], 'count': observation['sample_count']}
                            for name, observation in skills.items() if observation['sample_count'] >= 5],
         'skills': [
@@ -178,17 +219,32 @@ def build_report(store, owner, run_id=None, optimization_id=None):
 def optimization_report(store, owner, saved):
     """仅展示简版真实输入与资源解，不推导缺失的能力基线或课程学时。"""
     inputs, result = saved['data']['input'], saved['data']['result']
-    selected = [c for c in inputs['courses'] if c['id'] in result['selected']]
+    improved = result.get('benefit', 0) > 1e-8
+    selected = [c for c in inputs['courses'] if c['id'] in result['selected']] if improved else []
+    teaching_actions = {action['id']: action for action in inputs.get('teaching_actions', [])}
     courses = [{
         'id': c['id'], 'name': c['name'], 'credits': c['credits'],
         'hours': None, 'prerequisites': [],
     } for c in selected]
     catalogs = store.list('university_course_catalog', owner)
-    catalog = catalogs[0]['data'] if catalogs else {'courses': [], 'sources': []}
+    catalog = saved['data'].get('catalog_snapshot') or (catalogs[0]['data'] if catalogs else {'courses': [], 'sources': []})
     reason = '简版优化已保存资源组合与剩余缺口；未提供能力基线、完整专业课程及就业和需求情景，四年预测待补充。'
     resource_labels = [('cost', '调整预算', '元'), ('credits', '新增学分', '学分'),
                        ('teacher_hours', '师资课时', '课时'), ('lab_hours', '实验室课时', '课时'),
                        ('study_hours', '学生新增学习时间', '课时'), ('months', '完成期限', '月')]
+    checks = []
+    if not improved:
+        for course in inputs['courses']:
+            resources = [{'id': key, 'label': label, 'unit': unit, 'used': course[key],
+                          'limit': inputs['limits'][key], 'shortfall': max(0, course[key] - inputs['limits'][key])}
+                         for key, label, unit in resource_labels]
+            violations = [row['label'] + '超出上限' for row in resources if row['shortfall'] > 0]
+            checks.append({'action_id': course['id'], 'name': course['name'], 'feasible': not violations,
+                           'violations': violations, 'resources': resources})
+    infeasible = bool(checks) and all(not check['feasible'] for check in checks) and any(inputs['gaps'].values())
+    calculation = {'state': 'success' if improved else 'infeasible' if infeasible else 'no_improvement',
+                   'label': '已找到可行改善组合' if improved else '当前资源下没有可行候选' if infeasible else '当前候选未产生改善',
+                   'missing': [], 'reason': reason}
     metrics = [
         {'id': key, 'label': label, 'before': None,
          'after': result['used']['cost'] if key == 'cost' else None, 'unit': unit,
@@ -199,6 +255,8 @@ def optimization_report(store, owner, saved):
     ]
     return public_result({
         'generated_at': now(), 'program': None, 'metrics': metrics, 'student_skills': [],
+        'calculation': calculation,
+        'constraint_checks': checks, 'version_check': check_report_versions(store, owner, saved),
         'skills': [{'name': name, 'target': None, 'before': None, 'after': None, 'count': None,
                     'gap_before': gap, 'gap_after': result['remaining'][name]}
                    for name, gap in inputs['gaps'].items()],
@@ -208,9 +266,12 @@ def optimization_report(store, owner, saved):
         'forecast_status': 'incomplete', 'forecast_reason': reason, 'forecast_basis': None,
         'implementation_lag': None, 'admissions_delay_years': None,
         'metrics_scope': '已保存培养方案优化的输入与结果快照', 'sample_count': None,
-        'actions': [{'action_id': c['id'], 'kind': 'add', 'reason': '在本轮资源上限内选中的培养候选',
-                     'removed': [], 'added': [course], 'evidence': result.get('assumption', '录入的情景假设'),
-                     'cost': c['cost'], 'skill_delta': c['gains'], 'status': '已通过简版资源约束测算'}
+        'actions': [{'action_id': c['id'], 'kind': 'modify' if teaching_actions.get(c['id'], {}).get('kind') == 'enhance' else 'add',
+                     'reason': teaching_actions.get(c['id'], {}).get('name', '在本轮资源上限内选中的培养候选'),
+                     'removed': [], 'added': [course],
+                     'evidence': teaching_actions.get(c['id'], {}).get('evidence') or result.get('assumption', '录入的情景假设'),
+                     'cost': c['cost'], 'skill_delta': c['gains'], 'status': '已通过简版资源约束测算',
+                     'teaching_plan': c.get('teaching_plan')}
                     for c, course in zip(selected, courses)],
         'resources': [{'id': key, 'label': label, 'unit': unit, 'before': None,
                        'after': max((c['months'] for c in selected), default=0) if key == 'months' else result['used'][key],
@@ -232,3 +293,53 @@ def attach_university_report(app, store, user):
         if current['role'] != 'university':
             raise HTTPException(403, '仅高校账号可读取本校培养诊断报告')
         return build_report(store, current['id'], run_id, optimization_id)
+
+    @app.post('/api/university/report/recalculate')
+    def recalculate(payload: ReportRecalculation, current=Depends(user)):
+        if current['role'] != 'university':
+            raise HTTPException(403, '仅高校账号可重新测算本校报告')
+        if payload.confirmed is not True:
+            raise HTTPException(422, '请先确认输入差异，再生成新的测算记录')
+        saved = owned_result(store, current['id'], payload.run_id, 'decision_run')
+        versions = check_report_versions(store, current['id'], saved)
+        if payload.versions_token != versions['token']:
+            raise HTTPException(409, '输入在确认后再次变化，请刷新差异并重新确认')
+        if any(change['id'] in {'catalog', 'profile', 'workspace'} for change in versions['changes']):
+            raise HTTPException(422, '课程库或本校配置已变更，请先在培养向导确认课程、资源与动作并生成新方案')
+        case_id = saved['data'].get('case_id')
+        if not case_id:
+            raise HTTPException(422, '该历史记录没有关联方案，请在方案页面保存新方案后测算')
+        case = owned_result(store, current['id'], case_id, 'decision_case')['data']
+        inputs = []
+        for ident, kind in [(case['recruitment_id'], 'recruitment'),
+                            *([(case['employment_id'], 'employment')] if case.get('employment_id') else []),
+                            *[(ident, 'policy') for ident in case.get('policy_ids', [])]]:
+            item = owned_result(store, current['id'], ident, 'research_dataset')
+            if item['data']['kind'] != kind or item['data'].get('split') == 'evaluation':
+                raise HTTPException(422, '输入数据类型错误或属于封存评测集')
+            inputs.append(item)
+        recruitment = inputs[0]['data']['records']
+        employment = next((item['data']['records'] for item in inputs if item['data']['kind'] == 'employment'), [])
+        try:
+            result = run_decision(case, recruitment, employment)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        provenance = [{'dataset_id': item['id'], 'sha256': item['data']['sha256'],
+                       'source': item['data']['source_snapshot'], 'processing': item['data']['processing']}
+                      for item in inputs]
+        data = {'case_id': case_id, 'case': case, 'result': result, 'provenance': provenance,
+                'source_versions': report_source_versions(store, current['id'], case, provenance),
+                'supersedes_run_id': saved['id'], 'confirmed_versions_token': payload.versions_token}
+        if check_report_versions(store, current['id'], saved)['token'] != payload.versions_token:
+            raise HTTPException(409, '测算期间输入发生变化，请刷新差异并重新确认')
+        catalogs = store.list('university_course_catalog', current['id'])
+        data['catalog_snapshot'] = catalogs[0]['data'] if catalogs else None
+        ident = store.save('decision_run', current['id'], data)
+        store.audit(current['id'], 'recalculate_university_report', ident)
+        return {'id': ident, 'supersedes_run_id': saved['id']}
+
+
+class ReportRecalculation(BaseModel):
+    run_id: str
+    versions_token: str
+    confirmed: bool = False
