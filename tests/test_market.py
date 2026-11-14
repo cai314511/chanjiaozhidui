@@ -141,6 +141,19 @@ def test_search_covers_unsampled_titles_and_validates_inputs_and_recommendations
         assert client.get('/api/me/exploration', headers={'x-role': 'employer'}).status_code == 403
 
 
+def test_company_cards_expose_existing_history_without_publishing_jobs(tmp_path):
+    from backend.market import publish_market
+
+    store = Store(tmp_path / 'card-history')
+    publish_market(store, make_bundle(tmp_path))
+    with client_for(store) as client:
+        company = client.get('/api/market/search?q=甲公司', headers={'x-role': 'student'}).json()['companies'][0]
+        assert company['live_count'] == 0
+        assert company['history_count'] == 2
+        assert company['historical_preview'] == [{'title': '植物研究员', 'type': 'historical'}]
+        assert store.list('job') == []
+
+
 def test_ninety_character_registered_track_can_be_searched_and_saved(tmp_path):
     from backend.app import create_app
 

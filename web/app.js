@@ -23,7 +23,7 @@ Object.assign(routes,{research:['▧','产业资料管理'],decision:['◈','专
 routes.home[1]='工作空间';routes.weights[1]='招聘偏好';routes.model[1]='使用帮助';
 routes.admin=['⌘','统一管理入口'];
 routes.evidence=['▥','产业数据支撑'];
-routes['my-space']=['♧','我的'];routes.students=['♧','学生主页'];routes.home[1]='探索首页';
+routes['my-space']=['♧','个人主页'];routes.students=['♧','学生主页'];routes.home[1]='探索首页';
 routes.company=['⌂','公司主页'];routes.favorites=['☆','人才收藏'];routes.messages=['✉','消息中心'];
 routes['university-workspace']=['◈','培养方案向导'];
 function allowed(){

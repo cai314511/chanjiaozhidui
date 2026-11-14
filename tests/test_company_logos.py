@@ -14,6 +14,27 @@ def png_bytes(size=(64, 32)):
     return buffer.getvalue()
 
 
+def test_default_discovery_page_companies_have_verified_local_logos():
+    from backend.company_logos import logo_fields
+    from backend.market import company_id
+
+    names = [
+        '7-ELEVEn', 'A.O.史密斯（中国）', 'ABB', 'ABB杭州盈控自动化有限公司',
+        'ABB（中国）有限公司', 'ABB（中国）有限公司厦门分公司', 'Aden Group',
+        'Alpha & Omega Semiconductor Co., Ltd',
+        'AstraZeneca Wuxi Site   阿斯利康无锡供应基地', 'BAC大连有限公司',
+        'BPW（梅州）车轴有限公司',
+        'Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司',
+        'Bureau Veritas 必维毕法克检验（上海）有限公司',
+        'Bureau Veritas 必维申美商品检测（上海）有限公司',
+        'Bureau Veritas 必维诚硕科技（上海）有限公司',
+        'CBC(北京)信用管理有限公司', 'CSA GROUP', 'DEKRA德凯',
+        'EDG电子竞技俱乐部', 'INDITEX',
+    ]
+    for name in names:
+        assert logo_fields(company_id(name))['logo_status'] == 'verified', name
+
+
 def test_queue_covers_every_catalog_id_and_preserves_verified_entries(tmp_path):
     from backend.company_logos import initialize_registry, read_registry, register_verified_logo
     companies = [{'id': 'a' * 24, 'name': '甲公司'}, {'id': 'b' * 24, 'name': '乙公司'}]

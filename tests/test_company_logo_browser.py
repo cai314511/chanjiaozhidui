@@ -7,6 +7,26 @@ from playwright.sync_api import expect
 from tests.test_browser import browser_system, route
 
 
+def test_portrait_logo_stays_inside_company_mark_at_both_widths(browser_system):
+    browser, base = browser_system
+    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    name = 'Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司'
+    assert page.request.post(base + '/api/auth/register', data={
+        'username': 'portrait-logo-test', 'password': 'isolated-logo-1234',
+        'name': name, 'role': 'employer', 'company_tracks': ['检测认证'],
+    }).status == 200
+    page.goto(base)
+    route(page, 'company')
+    card = page.locator('.discovery-company').filter(has=page.locator('h4', has_text=name))
+    image = card.locator('.company-symbol img')
+    for width in [1440, 390]:
+        page.set_viewport_size({'width': width, 'height': 900})
+        image.scroll_into_view_if_needed()
+        image.evaluate('(img)=>img.decode()')
+        assert image.evaluate('(img)=>{const a=img.getBoundingClientRect(),b=img.parentElement.getBoundingClientRect();return a.top>=b.top&&a.left>=b.left&&a.bottom<=b.bottom&&a.right<=b.right}')
+    page.close()
+
+
 def test_local_logo_in_company_list_detail_and_image_failure(browser_system):
     browser, base = browser_system
     page = browser.new_page(viewport={'width': 1380, 'height': 1000})

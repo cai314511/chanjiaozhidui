@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-13T07:20:21.077442+00:00",
+  "updated_at": "2026-11-14T16:19:26.475336+00:00",
   "companies": {
     "a756f7da297c5cae3ea41bae": {
       "id": "a756f7da297c5cae3ea41bae",
@@ -196,29 +196,72 @@
     "7e113d7fdea62269908dbf10": {
       "id": "7e113d7fdea62269908dbf10",
       "name": "Alpha & Omega Semiconductor Co., Ltd",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "AOS",
+      "asset": "aos-c9a13f6e0480.png",
+      "source": {
+        "page_url": "https://www.aosmd.com/",
+        "asset_url": "https://www.aosmd.com/logo.svg",
+        "relationship_url": "https://www.aosmd.com/",
+        "relationship_note": "官网页眉AOSMD标识；页脚全称Alpha and Omega Semiconductor对应目录英文名。",
+        "reviewed_on": "2026-11-15",
+        "original_download_sha256": "bab4fe1d132dbb5863b55620d1461f5c4148448f473678babb67f38cc4395e5b",
+        "processing": "官方静态SVG经禁脚本、禁网络浏览器等比栅格化；本地仅提供PNG",
+        "verified_at": "2026-11-14T16:13:56.649935+00:00",
+        "download_sha256": "46859cc6806ce6f74da9d32a83ebcefba120b314e53264fc4b28965f40e351e0",
+        "asset_sha256": "c9a13f6e04809fde1a0a5a6400b4c8d4896c6dae56e20a88da91da28a5c99733",
+        "width": 927,
+        "height": 202
+      },
+      "status": "verified",
+      "aliases": [
+        "Alpha & Omega Semiconductor Co., Ltd"
+      ]
     },
     "33b67f834aac6c6fd428778d": {
       "id": "33b67f834aac6c6fd428778d",
       "name": "AstraZeneca Wuxi Site   阿斯利康无锡供应基地",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "AstraZeneca",
+      "asset": "astrazeneca-e455ff6f01c4.png",
+      "source": {
+        "page_url": "https://careers.astrazeneca.com/",
+        "asset_url": "https://tbcdn.talentbrew.com/company/7684/v2_0/img/icons/az-logo.svg",
+        "relationship_url": "https://careers.astrazeneca.com/",
+        "relationship_note": "阿斯利康官方招聘站页眉AstraZeneca Logo；无锡供应基地采用集团标识。",
+        "reviewed_on": "2026-11-15",
+        "original_download_sha256": "e0a9dc5d21935549e6966c8e1ec9df7785efbdcffbdb079eeffdc42e14b4513e",
+        "processing": "官方静态SVG经禁脚本、禁网络浏览器等比栅格化；本地仅提供PNG",
+        "verified_at": "2026-11-14T16:15:59.154757+00:00",
+        "download_sha256": "5f2963dd97ed9fea47d16ac1f84a53e4916b8a61c216513f5b3a9556692964db",
+        "asset_sha256": "e455ff6f01c4f96ca3757111f770e69327636c7f8ae0c656ea02a2a53f086b0f",
+        "width": 167,
+        "height": 40
+      },
+      "status": "verified",
+      "aliases": [
+        "AstraZeneca Wuxi Site   阿斯利康无锡供应基地"
+      ]
     },
     "9351d9b897e089562ea287d5": {
       "id": "9351d9b897e089562ea287d5",
       "name": "BAC大连有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "BAC",
+      "asset": "bac-b2b87518c895.png",
+      "source": {
+        "page_url": "https://baltimoreaircoil.com/",
+        "asset_url": "https://baltimoreaircoil.com/sites/default/files/logo_3.jpg",
+        "relationship_url": "https://baltimoreaircoil.com/es/bac-dalian-co-ltd-oficina-corporativa-e-instalacion-de-fabricacion",
+        "relationship_note": "集团官网展示BAC标识，并在官方分支名录列出BAC Dalian Co., Ltd。",
+        "reviewed_on": "2026-11-15",
+        "verified_at": "2026-11-14T16:14:00.395751+00:00",
+        "download_sha256": "b45806ffd9ad6ff3cfe704c25abe516698cb40d23feb0bd3707917fb3d73031d",
+        "asset_sha256": "b2b87518c895fc010a91383b089083f5aca63475c800c269c790269d45be49de",
+        "width": 570,
+        "height": 162
+      },
+      "status": "verified",
+      "aliases": [
+        "BAC大连有限公司"
+      ]
     },
     "4e56ffc2cbbcdbd5f9f8d426": {
       "id": "4e56ffc2cbbcdbd5f9f8d426",
@@ -244,56 +287,152 @@
     "81a9116d3676f347b2e8c2a1": {
       "id": "81a9116d3676f347b2e8c2a1",
       "name": "Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "Bureau Veritas",
+      "asset": "bureau-veritas-7d3096dd5636.png",
+      "source": {
+        "page_url": "https://www.bureauveritas.cn/",
+        "asset_url": "https://www.bureauveritas.cn/themes/custom/bureauveritasbase/favicon/android-chrome-192x192.png",
+        "relationship_url": "https://www.bureauveritas.cn/about-us/bv-in-china",
+        "relationship_note": "必维中国官网品牌图标；目录四个必维事业部及上海实体统一使用集团品牌标识。",
+        "reviewed_on": "2026-11-15",
+        "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。",
+        "verified_at": "2026-11-14T16:19:26.376565+00:00",
+        "download_sha256": "7c391d7c58731c8be2cb1b214dcc2c9f1a4efb34f6c68ded6523deff4bfdecd6",
+        "asset_sha256": "7d3096dd5636a219b48b10efd17706071c4cfcfc681a1b41111f86f8a6a57a08",
+        "width": 69,
+        "height": 85
+      },
+      "status": "verified",
+      "aliases": [
+        "Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司",
+        "Bureau Veritas 必维毕法克检验（上海）有限公司",
+        "Bureau Veritas 必维申美商品检测（上海）有限公司",
+        "Bureau Veritas 必维诚硕科技（上海）有限公司"
+      ]
     },
     "895e707c8f4cf3858fc8d33b": {
       "id": "895e707c8f4cf3858fc8d33b",
       "name": "Bureau Veritas 必维毕法克检验（上海）有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "Bureau Veritas",
+      "asset": "bureau-veritas-7d3096dd5636.png",
+      "source": {
+        "page_url": "https://www.bureauveritas.cn/",
+        "asset_url": "https://www.bureauveritas.cn/themes/custom/bureauveritasbase/favicon/android-chrome-192x192.png",
+        "relationship_url": "https://www.bureauveritas.cn/about-us/bv-in-china",
+        "relationship_note": "必维中国官网品牌图标；目录四个必维事业部及上海实体统一使用集团品牌标识。",
+        "reviewed_on": "2026-11-15",
+        "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。",
+        "verified_at": "2026-11-14T16:19:26.376565+00:00",
+        "download_sha256": "7c391d7c58731c8be2cb1b214dcc2c9f1a4efb34f6c68ded6523deff4bfdecd6",
+        "asset_sha256": "7d3096dd5636a219b48b10efd17706071c4cfcfc681a1b41111f86f8a6a57a08",
+        "width": 69,
+        "height": 85
+      },
+      "status": "verified",
+      "aliases": [
+        "Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司",
+        "Bureau Veritas 必维毕法克检验（上海）有限公司",
+        "Bureau Veritas 必维申美商品检测（上海）有限公司",
+        "Bureau Veritas 必维诚硕科技（上海）有限公司"
+      ]
     },
     "a8dac3e5c2f8e90f4b5e2a13": {
       "id": "a8dac3e5c2f8e90f4b5e2a13",
       "name": "Bureau Veritas 必维申美商品检测（上海）有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "Bureau Veritas",
+      "asset": "bureau-veritas-7d3096dd5636.png",
+      "source": {
+        "page_url": "https://www.bureauveritas.cn/",
+        "asset_url": "https://www.bureauveritas.cn/themes/custom/bureauveritasbase/favicon/android-chrome-192x192.png",
+        "relationship_url": "https://www.bureauveritas.cn/about-us/bv-in-china",
+        "relationship_note": "必维中国官网品牌图标；目录四个必维事业部及上海实体统一使用集团品牌标识。",
+        "reviewed_on": "2026-11-15",
+        "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。",
+        "verified_at": "2026-11-14T16:19:26.376565+00:00",
+        "download_sha256": "7c391d7c58731c8be2cb1b214dcc2c9f1a4efb34f6c68ded6523deff4bfdecd6",
+        "asset_sha256": "7d3096dd5636a219b48b10efd17706071c4cfcfc681a1b41111f86f8a6a57a08",
+        "width": 69,
+        "height": 85
+      },
+      "status": "verified",
+      "aliases": [
+        "Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司",
+        "Bureau Veritas 必维毕法克检验（上海）有限公司",
+        "Bureau Veritas 必维申美商品检测（上海）有限公司",
+        "Bureau Veritas 必维诚硕科技（上海）有限公司"
+      ]
     },
     "319dd7550bf73e1b3b9dc5be": {
       "id": "319dd7550bf73e1b3b9dc5be",
       "name": "Bureau Veritas 必维诚硕科技（上海）有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "Bureau Veritas",
+      "asset": "bureau-veritas-7d3096dd5636.png",
+      "source": {
+        "page_url": "https://www.bureauveritas.cn/",
+        "asset_url": "https://www.bureauveritas.cn/themes/custom/bureauveritasbase/favicon/android-chrome-192x192.png",
+        "relationship_url": "https://www.bureauveritas.cn/about-us/bv-in-china",
+        "relationship_note": "必维中国官网品牌图标；目录四个必维事业部及上海实体统一使用集团品牌标识。",
+        "reviewed_on": "2026-11-15",
+        "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。",
+        "verified_at": "2026-11-14T16:19:26.376565+00:00",
+        "download_sha256": "7c391d7c58731c8be2cb1b214dcc2c9f1a4efb34f6c68ded6523deff4bfdecd6",
+        "asset_sha256": "7d3096dd5636a219b48b10efd17706071c4cfcfc681a1b41111f86f8a6a57a08",
+        "width": 69,
+        "height": 85
+      },
+      "status": "verified",
+      "aliases": [
+        "Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司",
+        "Bureau Veritas 必维毕法克检验（上海）有限公司",
+        "Bureau Veritas 必维申美商品检测（上海）有限公司",
+        "Bureau Veritas 必维诚硕科技（上海）有限公司"
+      ]
     },
     "c9cf2e2b7345a6779f7f1a18": {
       "id": "c9cf2e2b7345a6779f7f1a18",
       "name": "CBC(北京)信用管理有限公司",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "CBC",
+      "asset": "cbc-beijing-98ae6bc06dd0.png",
+      "source": {
+        "page_url": "https://www.zhaopin.com/companydetail/CC572147136.htm",
+        "asset_url": "https://rd5-public.zhaopin.cn/imgs/company/28b78ea82c807334c4a63fa37b10b52c.jpg",
+        "relationship_url": "https://www.cbcbeijing.com.cn/fgs",
+        "relationship_note": "来源为智联招聘CBC泉州分公司企业资料的CBC品牌图，第三方招聘资料来源；与CBC官网全称及分支业务核对。非官网直接下载。",
+        "reviewed_on": "2026-11-15",
+        "processing": "提取原图上方CBC品牌区域（60,36,600,304），去除泉州分公司副标题及边缘留白；保留原始品牌像素。",
+        "verified_at": "2026-11-14T16:19:25.777769+00:00",
+        "download_sha256": "d1bd985cca059435d388123ea1cd83233177f59ac733434f4573ee040d2be535",
+        "asset_sha256": "98ae6bc06dd0d0f9abf42f15768ce94efb25d3126f4e772c07721074c64a7907",
+        "width": 516,
+        "height": 260
+      },
+      "status": "verified",
+      "aliases": [
+        "CBC(北京)信用管理有限公司"
+      ]
     },
     "d31170f7af63c56ff371e951": {
       "id": "d31170f7af63c56ff371e951",
       "name": "CSA GROUP",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "CSA Group",
+      "asset": "csa-group-9a3e59d0b5e7.png",
+      "source": {
+        "page_url": "https://sunspec.org/contributing-members/csa-group/",
+        "asset_url": "https://sunspec.org/wp-content/uploads/2019/12/CSAGroup-logo-01.png",
+        "relationship_url": "https://sunspec.org/contributing-members/csa-group/",
+        "relationship_note": "SunSpec联盟官方会员页明确列出CSA Group并提供集团蓝色标识；与CSA集团官网身份核对。图片来自联盟成员资料。",
+        "reviewed_on": "2026-11-15",
+        "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。",
+        "verified_at": "2026-11-14T16:19:26.098057+00:00",
+        "download_sha256": "28cce6878fff502749d8b4ee9b5f5745add8da8f6313f08a3e1aaad2b77f2627",
+        "asset_sha256": "9a3e59d0b5e7d1456389439826cccf9165a858fad9f684cf51de8e02ac6abdfa",
+        "width": 537,
+        "height": 227
+      },
+      "status": "verified",
+      "aliases": [
+        "CSA GROUP"
+      ]
     },
     "a39080c6b1dcf63081476a26": {
       "id": "a39080c6b1dcf63081476a26",
@@ -321,20 +460,47 @@
     "15fd23a08112be6dbc438b3a": {
       "id": "15fd23a08112be6dbc438b3a",
       "name": "EDG电子竞技俱乐部",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "EDG",
+      "asset": "edg-fef3da79aadd.png",
+      "source": {
+        "page_url": "https://lolesports.com/en-SG/season/115547545029543948/handbook",
+        "asset_url": "https://static.lolesports.com/teams/1631819297476_edg-2021-worlds.png",
+        "relationship_url": "https://lolesports.com/en-SG/season/115547545029543948/handbook",
+        "relationship_note": "Riot官方赛事League Handbook中EDWARD GAMING（EDG）对应战队图片，使用赛事官方公开标识。",
+        "reviewed_on": "2026-11-15",
+        "verified_at": "2026-11-14T16:14:06.668475+00:00",
+        "download_sha256": "9100cfc4067d1163848763e61db7f92aa3d3e19d629de2810b0146fb561065a1",
+        "asset_sha256": "fef3da79aadd43679e3f21b3c5f194ca4409667c533b9fa46df7021aa973461f",
+        "width": 1000,
+        "height": 1000
+      },
+      "status": "verified",
+      "aliases": [
+        "EDG电子竞技俱乐部"
+      ]
     },
     "e2227e0c2a6ecf8002380404": {
       "id": "e2227e0c2a6ecf8002380404",
       "name": "INDITEX",
-      "brand": null,
-      "asset": null,
-      "source": null,
-      "status": "pending",
-      "aliases": []
+      "brand": "INDITEX",
+      "asset": "inditex-3db3c48d37ec.png",
+      "source": {
+        "page_url": "https://www.inditex.com/itxcomweb/en/press/media-gallery/logos",
+        "asset_url": "https://www.inditex.com/itxcomweb/_next/static/media/logo_big.20hvzd4l8qr9a.svg",
+        "relationship_url": "https://www.inditex.com/itxcomweb/en/press/media-gallery/logos",
+        "relationship_note": "Inditex官方媒体资料页页眉完整品牌字标，保留实际浏览器响应并离线等比栅格化；未重绘。",
+        "processing": "官方SVG经禁脚本禁网络浏览器等比栅格化",
+        "reviewed_on": "2026-11-15",
+        "verified_at": "2026-11-14T16:16:09.383572+00:00",
+        "download_sha256": "3e372a6b3e14841d020b3af579b10ddee768aadcbb098a13b93bab7b376c049c",
+        "asset_sha256": "3db3c48d37ec8683d043643e0c50d3cc9bc98594261377eedcdffb5ea02fd95d",
+        "width": 320,
+        "height": 65
+      },
+      "status": "verified",
+      "aliases": [
+        "INDITEX"
+      ]
     },
     "a949f7c1b3e788c2c70384db": {
       "id": "a949f7c1b3e788c2c70384db",
@@ -245505,17 +245671,6 @@
     }
   },
   "pending_queue": [
-    "7e113d7fdea62269908dbf10",
-    "33b67f834aac6c6fd428778d",
-    "9351d9b897e089562ea287d5",
-    "81a9116d3676f347b2e8c2a1",
-    "895e707c8f4cf3858fc8d33b",
-    "a8dac3e5c2f8e90f4b5e2a13",
-    "319dd7550bf73e1b3b9dc5be",
-    "c9cf2e2b7345a6779f7f1a18",
-    "d31170f7af63c56ff371e951",
-    "15fd23a08112be6dbc438b3a",
-    "e2227e0c2a6ecf8002380404",
     "a949f7c1b3e788c2c70384db",
     "1f39eb8f0f238eb6b1ae4338",
     "c94be5d9d25c8e3ec9e0de0a",

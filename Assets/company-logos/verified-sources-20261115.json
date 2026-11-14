@@ -1,0 +1,149 @@
+[
+  {
+    "brand": "AOS",
+    "asset_name": "aos",
+    "company_names": [
+      "Alpha & Omega Semiconductor Co., Ltd"
+    ],
+    "allowed_asset_hosts": [
+      "www.aosmd.com"
+    ],
+    "source": {
+      "page_url": "https://www.aosmd.com/",
+      "asset_url": "https://www.aosmd.com/logo.svg",
+      "relationship_url": "https://www.aosmd.com/",
+      "relationship_note": "官网页眉AOSMD标识；页脚全称Alpha and Omega Semiconductor对应目录英文名。",
+      "reviewed_on": "2026-11-15"
+    },
+    "rasterize_svg": true
+  },
+  {
+    "brand": "AstraZeneca",
+    "asset_name": "astrazeneca",
+    "company_names": [
+      "AstraZeneca Wuxi Site   阿斯利康无锡供应基地"
+    ],
+    "allowed_asset_hosts": [
+      "tbcdn.talentbrew.com"
+    ],
+    "source": {
+      "page_url": "https://careers.astrazeneca.com/",
+      "asset_url": "https://tbcdn.talentbrew.com/company/7684/v2_0/img/icons/az-logo.svg",
+      "relationship_url": "https://careers.astrazeneca.com/",
+      "relationship_note": "阿斯利康官方招聘站页眉AstraZeneca Logo；无锡供应基地采用集团标识。",
+      "reviewed_on": "2026-11-15"
+    },
+    "rasterize_svg": true
+  },
+  {
+    "brand": "BAC",
+    "asset_name": "bac",
+    "company_names": [
+      "BAC大连有限公司"
+    ],
+    "allowed_asset_hosts": [
+      "baltimoreaircoil.com"
+    ],
+    "source": {
+      "page_url": "https://baltimoreaircoil.com/",
+      "asset_url": "https://baltimoreaircoil.com/sites/default/files/logo_3.jpg",
+      "relationship_url": "https://baltimoreaircoil.com/es/bac-dalian-co-ltd-oficina-corporativa-e-instalacion-de-fabricacion",
+      "relationship_note": "集团官网展示BAC标识，并在官方分支名录列出BAC Dalian Co., Ltd。",
+      "reviewed_on": "2026-11-15"
+    },
+    "rasterize_svg": false
+  },
+  {
+    "brand": "Bureau Veritas",
+    "asset_name": "bureau-veritas",
+    "company_names": [
+      "Bureau Veritas 必维工业与设施事业部必维质量技术服务（上海）有限公司",
+      "Bureau Veritas 必维毕法克检验（上海）有限公司",
+      "Bureau Veritas 必维申美商品检测（上海）有限公司",
+      "Bureau Veritas 必维诚硕科技（上海）有限公司"
+    ],
+    "allowed_asset_hosts": [
+      "www.bureauveritas.cn"
+    ],
+    "source": {
+      "page_url": "https://www.bureauveritas.cn/",
+      "asset_url": "https://www.bureauveritas.cn/themes/custom/bureauveritasbase/favicon/android-chrome-192x192.png",
+      "relationship_url": "https://www.bureauveritas.cn/about-us/bv-in-china",
+      "relationship_note": "必维中国官网品牌图标；目录四个必维事业部及上海实体统一使用集团品牌标识。",
+      "reviewed_on": "2026-11-15",
+      "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。"
+    },
+    "rasterize_svg": false
+  },
+  {
+    "brand": "CBC",
+    "asset_name": "cbc-beijing",
+    "company_names": [
+      "CBC(北京)信用管理有限公司"
+    ],
+    "allowed_asset_hosts": [
+      "rd5-public.zhaopin.cn"
+    ],
+    "source": {
+      "page_url": "https://www.zhaopin.com/companydetail/CC572147136.htm",
+      "asset_url": "https://rd5-public.zhaopin.cn/imgs/company/28b78ea82c807334c4a63fa37b10b52c.jpg",
+      "relationship_url": "https://www.cbcbeijing.com.cn/fgs",
+      "relationship_note": "来源为智联招聘CBC泉州分公司企业资料的CBC品牌图，第三方招聘资料来源；与CBC官网全称及分支业务核对。非官网直接下载。",
+      "reviewed_on": "2026-11-15",
+      "processing": "提取原图上方CBC品牌区域（60,36,600,304），去除泉州分公司副标题及边缘留白；保留原始品牌像素。"
+    },
+    "rasterize_svg": false
+  },
+  {
+    "brand": "CSA Group",
+    "asset_name": "csa-group",
+    "company_names": [
+      "CSA GROUP"
+    ],
+    "allowed_asset_hosts": [
+      "sunspec.org"
+    ],
+    "source": {
+      "page_url": "https://sunspec.org/contributing-members/csa-group/",
+      "asset_url": "https://sunspec.org/wp-content/uploads/2019/12/CSAGroup-logo-01.png",
+      "relationship_url": "https://sunspec.org/contributing-members/csa-group/",
+      "relationship_note": "SunSpec联盟官方会员页明确列出CSA Group并提供集团蓝色标识；与CSA集团官网身份核对。图片来自联盟成员资料。",
+      "reviewed_on": "2026-11-15",
+      "processing": "仅提取原图品牌区域，去除外围白色留白；保留品牌原始像素及比例。"
+    },
+    "rasterize_svg": false
+  },
+  {
+    "brand": "EDG",
+    "asset_name": "edg",
+    "company_names": [
+      "EDG电子竞技俱乐部"
+    ],
+    "allowed_asset_hosts": [
+      "static.lolesports.com"
+    ],
+    "source": {
+      "page_url": "https://lolesports.com/en-SG/season/115547545029543948/handbook",
+      "asset_url": "https://static.lolesports.com/teams/1631819297476_edg-2021-worlds.png",
+      "relationship_url": "https://lolesports.com/en-SG/season/115547545029543948/handbook",
+      "relationship_note": "Riot官方赛事League Handbook中EDWARD GAMING（EDG）对应战队图片，使用赛事官方公开标识。",
+      "reviewed_on": "2026-11-15"
+    },
+    "rasterize_svg": false
+  },
+  {
+    "brand": "INDITEX",
+    "company_names": [
+      "INDITEX"
+    ],
+    "source": {
+      "page_url": "https://www.inditex.com/itxcomweb/en/press/media-gallery/logos",
+      "asset_url": "https://www.inditex.com/itxcomweb/_next/static/media/logo_big.20hvzd4l8qr9a.svg",
+      "relationship_url": "https://www.inditex.com/itxcomweb/en/press/media-gallery/logos",
+      "relationship_note": "Inditex官方媒体资料页页眉完整品牌字标，保留实际浏览器响应并离线等比栅格化；未重绘。",
+      "processing": "官方SVG经禁脚本禁网络浏览器等比栅格化",
+      "reviewed_on": "2026-11-15"
+    },
+    "processing": "浏览器访问官方媒体页并读取页眉SVG响应，离线栅格化；无需修改下载器。"
+  }
+]

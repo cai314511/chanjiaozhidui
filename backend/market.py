@@ -260,7 +260,11 @@ def _market_view(store):
 
 def _public_company(company):
     from backend.company_logos import logo_fields
-    return {key: value for key, value in company.items() if key not in {'historical_jobs', 'search_terms', '_search'}} | logo_fields(company['id'])
+    preview = [{'title': job['title'], 'type': 'historical'}
+               for job in company.get('historical_jobs', [])[:2]]
+    return ({key: value for key, value in company.items()
+             if key not in {'historical_jobs', 'search_terms', '_search'}}
+            | {'historical_preview': preview} | logo_fields(company['id']))
 
 
 class MarketModel(BaseModel):

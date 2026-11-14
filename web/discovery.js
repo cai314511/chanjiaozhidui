@@ -16,6 +16,10 @@ export async function discoveryHome(){
 function historicalCard(j){
  return `<article class="discovery-job"><div><span class="tag">${j.type==='live'?'平台发布':'本地历史资料'}</span><h4>${e(j.title)}</h4><p>${e(j.company)} · ${e(j.city||'城市未注明')} · ${e(j.published||j.month||'')}</p><p class="hint">${j.salary?fmt(j.salary[0])+'–'+fmt(j.salary[1])+' 元/月':'薪资未注明'}</p></div>${j.type==='live'&&state.jobs.some(k=>k.id===j.id)?button('查看岗位','job-detail',j.id,'small'):button('查看企业','market-company',j.company_id,'small')}</article>`;
 }
+function companyOpportunities(company){
+ const history=company.historical_preview||[],live=company.live_count||0;
+ return `<div class="company-opportunities"><p class="hint">${live?`<strong>${fmt(live)} 个平台在招岗位</strong> · `:''}已收录 ${fmt(company.history_count)} 条历史招聘</p>${history.length?`<ul aria-label="已收录岗位">${history.map(job=>`<li>${e(job.title)}</li>`).join('')}</ul>`:''}${!live&&history.length?'<small>历史岗位可查看职责与要求，当前招聘以企业发布为准。</small>':''}</div>`;
+}
 async function loadResults(){
  const host=document.querySelector('#discovery-results');if(!host)return;
  const version=++searchVersion,epoch=state.sessionEpoch,query={...search};
@@ -26,6 +30,7 @@ async function loadResults(){
  host.innerHTML=`<section class="panel"><div class="section-head"><div><h3>相关企业</h3><p>${fmt(data.total_companies)} 家匹配企业</p></div>${query.track&&state.user.role==='student'?button('收藏 '+query.track,'favorite-track',query.track,'small'):''}</div><div class="discovery-companies">${data.companies.map(c=>`<article class="discovery-company"><div class="company-symbol">${e(c.name.slice(0,1))}</div><span class="tag">${c.registered?'平台已入驻':'本地资料收录'}</span><h4>${e(c.name)}</h4><div class="chips">${c.tracks.map(t=>`<button class="tag track-chip" data-action="explore-track" data-id="${e(t)}">${e(t)}</button>`).join('')}</div><p class="hint">${fmt(c.history_count)} 条历史公告 · ${fmt(c.live_count)} 个平台岗位</p><div class="inline">${button('查看企业','market-company',c.id,'small')}${state.user.role==='student'?button('收藏企业','favorite-company',c.id,'small'):''}</div></article>`).join('')||empty(data.total_companies?'本页没有其他企业':'还没有匹配的企业',data.total_companies?'相关岗位继续列在下方。':'试试其他关键词或清除赛道筛选。')}</div><div class="inline pagination">${data.page>1?button('上一页','market-page',data.page-1):''}<span class="hint">第 ${data.page} / ${pages} 页 · 企业与岗位同步翻页</span>${data.page<pages?button('下一页','market-page',data.page+1):''}</div></section>
  <section class="panel"><h3>相关岗位</h3><p class="hint">${fmt(data.total_jobs)} 条检索结果；下列历史条目供研究探索，正在招聘的平台岗位以发布标识为准。</p>${data.jobs.map(historicalCard).join('')||empty('暂未找到岗位','可先收藏感兴趣的企业或赛道，留意平台后续发布。')}</section>`;
  host.querySelectorAll('.discovery-company .company-symbol').forEach((symbol,index)=>{symbol.outerHTML=companyBrand(data.companies[index])});
+ host.querySelectorAll('.discovery-company').forEach((card,index)=>{card.querySelector('p.hint').outerHTML=companyOpportunities(data.companies[index])});
  bindCompanyBrands(host);
 }
 
