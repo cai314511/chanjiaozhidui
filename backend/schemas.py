@@ -173,6 +173,7 @@ class AgentRequest(Model):
     job_id: str | None = None
     mode: Literal["chat", "job", "profile", "assessment", "curriculum"] = "chat"
     send_documents: bool = False
+    parent_run_id: str | None = Field(default=None, max_length=80)
 
 
 class Course(Model):

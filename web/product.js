@@ -34,7 +34,7 @@ export function bindProfile(){
  form.addEventListener('submit',async event=>{event.preventDefault();const values=Object.fromEntries(new FormData(form)),p=state.profile;
   const payload={major:values.major,school_name:values.school_name,career:values.career,experience:values.experience,language:values.language,school_code:values.school_code,abilities:p.abilities||{},preferences:{...p.preferences,cities:values.cities.split(/[，,]/).map(v=>v.trim()).filter(Boolean),salary_target:Number(values.salary_target||0)},resources:{budget:Number(values.resource_budget||0),study_hours:Number(values.resource_study_hours||0),months:Number(values.resource_months||0)}};
   Object.assign(payload,{graduation_month:values.graduation_month,degree:values.degree,academic_status:values.academic_status});
-  try{await put('/profile',payload);toast('画像已保存；你可以继续补充经历');}catch(err){toast(err.message);}
+  try{await put('/profile',payload);form.dataset.profileSaved='true';toast('画像已保存；你可以继续补充经历');}catch(err){toast(err.message);}
  });
 }
 export function weightsPage(){const jobs=state.jobs.filter(j=>j.owner===state.user.id);return heading('招聘偏好','选择你更关注的能力，系统会更新候选人的匹配结果。')+(jobs.length?`<div class="toolbar"><select class="control" id="weight-select" aria-label="选择岗位">${jobs.map(j=>`<option value="${j.id}">${e(j.title)}</option>`).join('')}</select></div><div id="weight-workspace"></div>`:empty('先发布一个岗位','你可以上传JD，由助手整理岗位草稿。',button('上传JD','upload')));}

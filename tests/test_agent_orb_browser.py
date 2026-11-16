@@ -111,6 +111,10 @@ def test_agent_voice_confirmation_and_webgl_fallback(browser_system, role):
     # 真实 WebGL context 丢失时保留输入，提供静态玻璃降级。
     page.locator('.agent-orb-stage canvas').evaluate("canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true}))")
     expect(page.locator('.agent-orb-stage')).to_have_attribute('data-render', 'fallback')
+    # 新交互在回复完成后展示聊天；返回水滴画面仍必须显示可用的静态降级。
+    expect(page.locator('#agent-drawer')).to_have_attribute('data-view', 'conversation')
+    expect(page.locator('.agent-orb-fallback')).not_to_be_visible()
+    page.get_by_role('button', name='返回输入画面', exact=True).click()
     expect(page.locator('.agent-orb-fallback')).to_be_visible()
     expect(page.locator('#agent-form textarea')).to_be_editable()
     page.evaluate("window.dispatchEvent(new Event('identity-reset'))")

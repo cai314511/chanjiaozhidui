@@ -29,3 +29,21 @@
 @media(max-width:740px){.agent-drawer:not([hidden]){right:10px;bottom:78px;width:calc(100vw - 20px);height:min(760px,calc(100dvh - 94px));max-height:calc(100dvh - 94px);padding:14px 16px}.agent-mode-navigation{margin-top:7px}.agent-mode-tabs button{font-size:12px;padding:8px 5px}#agent-mode-description{font-size:12px;min-height:38px;margin-top:6px}.agent-orb-wrap{min-height:144px}.agent-orb-stage{width:124px;height:124px}.agent-orb-wrap:has([data-mode=thinking])::before,.agent-orb-wrap:has([data-mode=thinking])::after{width:116px;height:116px}.agent-orb-status{font-size:12px}}
 @media(max-height:620px){.agent-drawer:not([hidden]){bottom:10px;height:calc(100dvh - 20px);max-height:calc(100dvh - 20px);padding:10px 16px}.agent-mode-navigation{margin-top:4px}.agent-mode-tabs button{padding:6px}#agent-mode-description{min-height:0;font-size:11px;margin:4px 0}.agent-orb-wrap{min-height:82px;margin:0}.agent-orb-stage{width:64px;height:64px}.agent-orb-status{font-size:11px}.agent-orb-wrap:has([data-mode=thinking])::before,.agent-orb-wrap:has([data-mode=thinking])::after{width:62px;height:62px;top:0}.agent-service-note{padding:4px 8px;margin:0;font-size:11px}.agent-drawer>small{display:none}.agent-drawer .agent-welcome{display:none}}
 @media(prefers-reduced-motion:reduce){.agent-orb-wrap::before,.agent-orb-wrap::after,.agent-orb-fallback{animation:none!important}}
+
+/* 水滴与聊天共用弹性主展示区，结果完成后释放整个区域给对话。 */
+.agent-display{position:relative;flex:1 1 0;min-height:0;display:flex;flex-direction:column;overflow:hidden;border-radius:18px}
+.agent-display .agent-orb-wrap{flex:1;min-height:0;margin:0}
+.agent-display .agent-messages{flex:1;min-height:0;padding:8px 8px 14px 0;scroll-padding-top:8px}
+.agent-drawer[data-view=conversation] .agent-orb-wrap,.agent-drawer[data-view=thinking] .agent-messages{display:none}
+.agent-drawer[data-view=idle] .agent-messages{display:none}
+.agent-drawer[data-view=composing] .agent-messages{display:none}
+.agent-history-toggle{flex:none;align-self:center;background:#fffff575;border:1px solid #a6bba477;border-radius:10px;padding:5px 12px;color:#416858;font-size:12px;cursor:pointer;margin:3px 0}
+.agent-drawer[data-view=idle] .agent-history-toggle{display:none}
+.agent-drawer .agent-message-label{font-size:12px;color:#5a796b;font-weight:600;margin-bottom:7px}
+.agent-drawer .message{white-space:normal;padding:15px 16px;border:1px solid #a2b9aa40;background:linear-gradient(135deg,#fffff8ce,#eaf5edb0);border-radius:16px}
+.agent-drawer .message.user{background:#dbeae7ad}.agent-message-text{white-space:pre-wrap;font-size:15px;line-height:1.85;user-select:text}
+.agent-message-actions{display:flex;gap:8px;margin-top:12px;padding-top:9px;border-top:1px solid #a1b7a940;flex-wrap:wrap}
+.agent-message-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid #96b29f66;border-radius:9px;padding:6px 10px;background:#fffff68c;color:#355e4f;font-size:13px;cursor:pointer;min-height:32px}
+.agent-message-actions button:hover{background:#dceee0}.agent-message-actions button:focus-visible{outline:2px solid #947936;outline-offset:2px}
+.agent-followup{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding:7px 10px;background:#e4efe3b3;border-radius:9px;color:#426958;font-size:12px}.agent-followup[hidden]{display:none}.agent-followup span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agent-followup button{border:0;background:transparent;font-size:18px;color:inherit;cursor:pointer}
+@media(max-width:740px){.agent-display .message{padding:12px}.agent-message-text{font-size:14px}.agent-drawer[data-view=conversation] #agent-mode-description{min-height:0;margin-bottom:0}.agent-drawer #agent-form textarea{height:66px;min-height:60px}.agent-message-actions button{min-height:36px}}

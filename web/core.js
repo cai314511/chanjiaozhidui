@@ -43,6 +43,7 @@ export function dismissDialog(){
  el.close();
 }
 export function closeDialog(){dialogDrafts.delete(dialogKey);document.querySelector('#modal').close();}
+export function dialogDraftHandle(){const key=dialogKey;return ()=>{dialogDrafts.delete(key);if(dialogKey===key)document.querySelector('#modal').close();};}
 export function field(label,name,value='',type='text',extra=''){
   const control=type==='textarea'?`<textarea name="${e(name)}" ${extra}>${e(value)}</textarea>`:`<input name="${e(name)}" type="${e(type)}" value="${e(value)}" ${extra}>`;
   return `<div class="field"><label>${e(label)}${control}</label></div>`;

@@ -24,7 +24,7 @@ export function jobEditor(draft=null){
   Object.assign(payload,{graduation_from:data.graduation_from||'',graduation_to:data.graduation_to||'',degrees:splitList(data.degrees),academic_statuses:splitList(data.academic_statuses),status:data.status||'published'});
   for(const k of ['salary_min','salary_max','capacity','training_cost','mentor_hours'])payload[k]=num(data[k]);
   const btn=form.querySelector('[type=submit]');btn.disabled=true;
-  try{if(j.id)await put('/jobs/'+j.id+'?version='+j.version,payload);else await post('/jobs',payload);await refresh();closeDialog();navigate('jobs');toast(j.id?'岗位新版本已保存':'岗位已发布');}catch(err){document.querySelector('#job-error').textContent=err.message;}finally{btn.disabled=false;}
+  try{if(j.id)await put('/jobs/'+j.id+'?version='+j.version,payload);else await post('/jobs',payload);form.dispatchEvent(new Event('job-saved'));await refresh();closeDialog();navigate('jobs');toast(j.id?'岗位新版本已保存':'岗位已发布');}catch(err){document.querySelector('#job-error').textContent=err.message;}finally{btn.disabled=false;}
  });
 }
 on('edit-job',async el=>jobEditor(await api('/recruiting/jobs/'+el.dataset.id+'/spec')));
