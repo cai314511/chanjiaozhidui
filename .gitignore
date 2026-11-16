@@ -13,3 +13,9 @@ Assets/company-logos/.registry-write.lock
 Assets/company-logos/.registry-*.part
 
 models/
+
+# 本地路演成果与个人素材，保留本机，不随项目代码上传。
+/ppt.pptx
+/ppt素材/
+/Assets/二维码.png
+/产教智对_方案报告 (1)(2).pdf
