@@ -55,10 +55,12 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
     @app.post('/api/voice/transcribe')
     async def voice_transcribe(file: UploadFile = File(...), current=Depends(user)):
         from starlette.concurrency import run_in_threadpool
-        from backend.voice import transcribe
+        from backend.voice import transcribe, VoiceUnavailable
         content = await file.read(12 * 1024 * 1024 + 1)
         try:
             return await run_in_threadpool(transcribe, content)
+        except VoiceUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
         except (ValueError, av.error.FFmpegError, IndexError) as exc:
             raise HTTPException(422, str(exc))
 

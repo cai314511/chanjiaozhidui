@@ -1,0 +1,5 @@
+# 可选本地 SenseVoice 识别依赖；先安装 requirements.txt，再安装本文件。
+funasr>=1.4.26,<1.5
+torch>=2.6,<3
+torchaudio>=2.6,<3
+sentencepiece>=0.2,<0.3

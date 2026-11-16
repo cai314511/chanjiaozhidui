@@ -11,3 +11,5 @@ _run_*.py
 .DS_Store
 Assets/company-logos/.registry-write.lock
 Assets/company-logos/.registry-*.part
+
+models/
