@@ -6,6 +6,7 @@ import {installGlass,updateGlass} from './glass.js';
 import './voice.js';
 import {curriculumPage,bindCurriculum} from './curriculum.js';
 import {openAssistant,closeAssistant} from './assistant.js';
+import {installInteractions} from './interactions.js';
 import {researchDataPage,decisionPage,rulesPage,bindCompetition} from './competition.js';
 import {administrationPage} from './administration.js';
 import {evidencePage,evidenceTeaser,bindEvidence} from './evidence.js';
@@ -126,4 +127,4 @@ document.querySelector('#agent-toggle').addEventListener('click',()=>{const draw
 window.addEventListener('navigate',render);
 window.addEventListener('open-student-page',event=>{if(state.user&&actions['student-page'])actions['student-page']({dataset:{id:event.detail}}).catch(error=>toast(error.message));});
 async function boot(){try{const demo=await api('/demo/status');if(demo.expired)await post('/demo/exit',{});state.demo=demo.active;state.health=await api('/health');}catch(err){toast('服务连接失败：'+err.message);}try{state.user=await api('/auth/me');state.publicDemo=!state.demo&&state.user.role==='university'&&sessionStorage.getItem('publicDemo')==='1';await refresh();}catch(err){state.user=null;}await render();const student=new URLSearchParams(location.search).get('student');if(student&&state.user&&actions['student-page'])await actions['student-page']({dataset:{id:student}});}
-installGlass();installInputHelpers();boot();
+installGlass();installInputHelpers();installInteractions({closeAssistant});boot();

@@ -63,7 +63,16 @@ async function startGuide(progress=null){
  const epoch=state.sessionEpoch,data=progress||await api('/me/exploration');if(epoch!==state.sessionEpoch)return;
  guide={epoch,index:0,answers:data.answers||{},text:data.text||'',busy:false};
  let modal=document.querySelector('#exploration-dialog');
- if(!modal){modal=document.createElement('dialog');modal.id='exploration-dialog';modal.className='exploration-dialog';document.body.append(modal);modal.addEventListener('cancel',()=>{window.dispatchEvent(new Event('dictation-stop'));guide=null;});modal.addEventListener('close',()=>window.dispatchEvent(new Event('dictation-stop')));}
+ if(!modal){
+  modal=document.createElement('dialog');modal.id='exploration-dialog';modal.className='exploration-dialog';document.body.append(modal);
+  const outside=event=>{const box=modal.getBoundingClientRect();return event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom};
+  let backdropPress=false;
+  modal.addEventListener('pointerdown',event=>{backdropPress=event.button===0&&event.target===modal&&outside(event)});
+  modal.addEventListener('pointercancel',()=>{backdropPress=false});
+  modal.addEventListener('click',event=>{const dismiss=backdropPress&&event.target===modal&&outside(event);backdropPress=false;if(dismiss)closeGuide()});
+  modal.addEventListener('cancel',event=>{event.preventDefault();closeGuide()});
+  modal.addEventListener('close',()=>window.dispatchEvent(new Event('dictation-stop')));
+ }
  paintGuide();if(!modal.open)modal.showModal();
  await put('/me/exploration',{seen:true,answers:guide.answers,text:guide.text});
 }
@@ -83,7 +92,8 @@ on('exploration-start',()=>startGuide());
 on('guide-select',el=>{if(!guide||recordingGuide())return;captureGuide();const key=questions[guide.index].key,values=guide.answers[key]||[];guide.answers[key]=values.includes(el.dataset.id)?values.filter(v=>v!==el.dataset.id):[...values,el.dataset.id];paintGuide();});
 on('guide-voice',el=>{dictateInto(document.querySelector('#guide-text'),el).catch(error=>toast(error.message));});
 on('guide-back',()=>{if(!guide||recordingGuide())return;captureGuide();guide.index=Math.max(0,guide.index-1);paintGuide();});
-on('explore-skip',()=>{captureGuide();const current=guide;guide=null;document.querySelector('#exploration-dialog')?.close();if(current)put('/me/exploration',{seen:true,answers:current.answers,text:current.text}).catch(error=>toast(error.message));});
+function closeGuide(){captureGuide();const current=guide;guide=null;document.querySelector('#exploration-dialog')?.close();if(current)put('/me/exploration',{seen:true,answers:current.answers,text:current.text}).catch(error=>toast(error.message));}
+on('explore-skip',closeGuide);
 on('guide-next',async el=>{
  if(!guide||guide.busy||recordingGuide())return;captureGuide();const current=guide;current.busy=true;el.disabled=true;
  try{

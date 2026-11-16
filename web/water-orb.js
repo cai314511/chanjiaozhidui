@@ -16,11 +16,12 @@ vec3 waterPosition(vec3 p){
  if(waterAssistant>.5){
   float softness=noise3(p*1.6+vec3(t*.13,-t*.09,t*.11))-.5;
   float breathing=noise3(p*2.8+vec3(-t*.08,t*.12,t*.06))-.5;
-  vec3 q=p*(1.+softness*(.085+waterEnergy*.055)+breathing*.025);
+  float flow=sin(p.y*5.5-t*2.6+noise3(p*2.)*2.);
+  vec3 q=p*(1.+softness*(.085+waterEnergy*.055+waterActivity*.12)+breathing*.025+flow*waterActivity*.04);
   q.x*=1.+.035*sin(t*.39+1.2);
   q.y*=1.035+.025*sin(t*.27);
   q.z*=.98+.025*cos(t*.31);
-  q.x+=.028*sin(p.y*2.4+t*.33)*p.y;
+  q.x+=(.028+waterActivity*.065)*sin(p.y*2.4+t*.8)*p.y;
   q.z+=.018*sin(p.x*2.1-t*.26)*p.y;
   return q;
  }
@@ -240,9 +241,9 @@ export class WaterOrb {
  render(time) {
   if(this.disposed||document.hidden||this.assistant&&this.contextUnavailable)return;
   const dt=this.last?Math.min(.05,(time-this.last)/1000):0;this.last=time;
-  const target=['listening','speaking'].includes(this.mode)?this.volume:0;
+  const target=['listening','speaking'].includes(this.mode)?this.volume:this.assistant&&this.mode==='thinking'?.5:0;
   this.energy+=(target-this.energy)*(1-Math.exp(-dt*7));
-  const speed=this.assistant?(this.mode==='thinking'?.44:this.mode==='listening'?.33:.22):(this.mode==='thinking'?1.4:this.mode==='listening'?1.05:.65);
+  const speed=this.assistant?(this.mode==='thinking'?1.6:this.mode==='listening'?.8:.32):(this.mode==='thinking'?1.4:this.mode==='listening'?1.05:.65);
   if(!this.reduced.matches&&!(this.assistant&&this.mode==='error'))this.elapsed+=dt*speed;
   this.uniforms.waterTime.value=this.elapsed;
   this.uniforms.waterEnergy.value=this.reduced.matches?0:this.energy;

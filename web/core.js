@@ -25,8 +25,24 @@ export async function api(path,options={}){
 export const post=(path,data,options={})=>api(path,{method:'POST',body:JSON.stringify(data),...options});
 export const put=(path,data)=>api(path,{method:'PUT',body:JSON.stringify(data)});
 export function navigate(route){state.route=route;window.dispatchEvent(new Event('navigate'));}
-export function dialog(title,body){const el=document.querySelector('#modal');document.querySelector('#modal-content').innerHTML=`<div class="dialog-head"><h2>${e(title)}</h2><button class="icon-btn" data-action="close-modal" aria-label="关闭">×</button></div>${body}`;if(!el.open)el.showModal();}
-export function closeDialog(){document.querySelector('#modal').close();}
+const dialogDrafts=new Map();let dialogKey='';
+window.addEventListener('identity-reset',()=>{dialogDrafts.clear();dialogKey=''});
+export function dialog(title,body){
+ const el=document.querySelector('#modal');dialogKey=title+'\0'+body;
+ document.querySelector('#modal-content').innerHTML=`<div class="dialog-head"><h2>${e(title)}</h2><button class="icon-btn" data-action="close-modal" aria-label="关闭">×</button></div>${body}`;
+ const controls=[...el.querySelectorAll('input,textarea,select')];
+ for(const draft of dialogDrafts.get(dialogKey)||[]){const control=controls[draft.index];if(control&&control.name===draft.name)control.value=draft.value;}
+ if(!el.open)el.showModal();
+}
+export function dismissDialog(){
+ const el=document.querySelector('#modal');
+ const drafts=[...el.querySelectorAll('input,textarea,select')].flatMap((control,index)=>
+  control.name&&!['password','file','hidden','checkbox','radio'].includes(control.type)?[{index,name:control.name,value:control.value}]:[]);
+ if(drafts.length){dialogDrafts.delete(dialogKey);dialogDrafts.set(dialogKey,drafts);if(dialogDrafts.size>20)dialogDrafts.delete(dialogDrafts.keys().next().value);}
+ if([...el.querySelectorAll('input[type=file]')].some(input=>input.files.length))toast('窗口已关闭；尚未提交的文件重新打开后需再次选择');
+ el.close();
+}
+export function closeDialog(){dialogDrafts.delete(dialogKey);document.querySelector('#modal').close();}
 export function field(label,name,value='',type='text',extra=''){
   const control=type==='textarea'?`<textarea name="${e(name)}" ${extra}>${e(value)}</textarea>`:`<input name="${e(name)}" type="${e(type)}" value="${e(value)}" ${extra}>`;
   return `<div class="field"><label>${e(label)}${control}</label></div>`;

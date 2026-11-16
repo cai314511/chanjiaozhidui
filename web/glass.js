@@ -34,6 +34,7 @@ export function installGlass(){
  modal.querySelector('input').addEventListener('input',event=>filterCommands(event.target.value));
  modal.addEventListener('click',event=>{const el=event.target.closest('[data-command]');if(el){modal.close();navigate(el.dataset.command);}});
  modal.addEventListener('keydown',event=>{
+  if(event.isComposing||event.keyCode===229)return;
   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();if(!commands.length)return;selected=(selected+(event.key==='ArrowDown'?1:-1)+commands.length)%commands.length;modal.querySelectorAll('[role=option]').forEach((el,i)=>el.setAttribute('aria-selected',i===selected));modal.querySelectorAll('[role=option]')[selected]?.scrollIntoView({block:'nearest'});}
   if(event.key==='Enter'){event.preventDefault();choose();}
  });

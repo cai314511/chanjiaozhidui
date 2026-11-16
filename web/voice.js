@@ -9,6 +9,7 @@ let dictation=null,callStream=null;
 let liveTranscriber=null,playbackContext=null,playbackFrame;
 let playbackGeneration=0,finishPlayback=null;
 let waterOrb=null;
+const transcriptDrafts=new Map();
 let captureEpoch=0;
 function cancelPlayback(){playbackGeneration++;playback?.pause();finishPlayback?.();finishPlayback=null;cancelAnimationFrame(playbackFrame);playbackContext?.close();playbackContext=null;waterOrb?.setVolume(0)}
 const modal=()=>document.querySelector('#modal');
@@ -16,6 +17,8 @@ function valid(session){return active===session&&state.sessionEpoch===session.ep
 function setStatus(mode,text){const stage=document.querySelector('.droplet-stage');if(stage)stage.dataset.mode=mode;waterOrb?.setMode(mode);const el=document.querySelector('#voice-status');if(el)el.textContent=text;const mic=document.querySelector('#voice-mic');if(mic){mic.setAttribute('aria-pressed',String(mode==='listening'));mic.setAttribute('aria-label',mode==='listening'?'停止录音':'开始录音')}}
 async function checkedFetch(path,body,session){const response=await fetch('/api'+path,{method:'POST',credentials:'same-origin',headers:body instanceof FormData?{}:{'Content-Type':'application/json'},body:body instanceof FormData?body:JSON.stringify(body)});if(!valid(session))throw new DOMException('访谈已关闭','AbortError');if(!response.ok){const data=await response.json();throw new Error(typeof data.detail==='string'?data.detail:'语音请求失败');}return response;}
 export function stopVoice(){
+ const transcript=document.querySelector('#voice-transcript');
+ if(active?.draftKey&&transcript){transcriptDrafts.set(active.draftKey,transcript.value);if(transcriptDrafts.size>20)transcriptDrafts.delete(transcriptDrafts.keys().next().value);}
  waterOrb?.dispose();waterOrb=null;
  liveTranscriber?.cancel();liveTranscriber=null;cancelPlayback();
  stopDictation();
@@ -27,7 +30,7 @@ export function stopVoice(){
 }
 modal().addEventListener('close',stopVoice);
 window.addEventListener('navigate',stopVoice);
-window.addEventListener('identity-reset',stopVoice);
+window.addEventListener('identity-reset',()=>{stopVoice();transcriptDrafts.clear()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){captureEpoch++;if(recording)pauseRecording();stopDictation();}});
 window.addEventListener('dictation-stop',stopDictation);
 async function localSpeak(text,session){
@@ -71,9 +74,10 @@ function paint(session){
  }
 }
 async function openSession(data){
- stopVoice();active={data,epoch:state.sessionEpoch};const session=active;
+ stopVoice();active={data,epoch:state.sessionEpoch,draftKey:state.user.id+':'+data.id};const session=active;
  dialog(data.mode==='profile'?'聊聊你的经历':data.mode==='human'?'企业真人面试':'岗位语音面试',`<div class="interview-layout"><div><div class="droplet-stage" data-mode="idle"><div class="droplet" aria-hidden="true"></div></div><div id="voice-status" class="voice-status" role="status">${data.mode==='human'?'等待双方接通':'已准备好，本地识别与播报'}</div><div class="voice-controls"><button class="mic-button" id="voice-mic" aria-label="开始或停止录音">◉</button><button class="btn" id="voice-replay">重播问题</button>${data.mode==='human'?'<button class="btn" id="human-connect">接通音频</button>':''}</div><p class="voice-state-note">${data.mode==='human'?'真人音频直接连接双方设备':'音频在本机处理 · 转写可修改'}</p><label class="check"><input type="checkbox" id="voice-auto"><span>连续对话：停顿后自动发送本轮转写</span></label>${['ai','profile'].includes(data.mode)?'<label class="check"><input type="checkbox" id="voice-consent"><span>同意将本次核对的转写发给 DeepSeek，用于面试追问</span></label>':''}</div><div><div id="voice-messages" class="voice-messages" aria-live="polite"></div><div class="field"><label>本轮实时转写，可直接修改<textarea id="voice-transcript" class="voice-transcript" placeholder="开始说话，识别结果会出现在这里…" maxlength="6000"></textarea></label></div><div class="inline"><button class="btn primary" id="voice-send">确认并回答</button><button class="btn" id="voice-summary">整理为个人介绍</button></div><p class="hint" id="voice-error"></p></div></div><audio id="remote-audio" autoplay controls hidden></audio>`);
  modal().classList.add('voice-dialog');arrangeVoice(modal());paint(session);
+ document.querySelector('#voice-transcript').value=transcriptDrafts.get(session.draftKey)||'';
  const interactionRoot=modal().querySelector('.interview-layout');
  interactionRoot.addEventListener('pointerdown',()=>session.interacted=true,{once:true});
  interactionRoot.addEventListener('keydown',()=>session.interacted=true,{once:true});
