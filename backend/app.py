@@ -663,12 +663,41 @@ def create_app(data_root=None, enable_demo=True):
         store.save("document", current["id"], data, ident)
         return flat(entity(ident))
 
+    def agent_job_access(ident, current):
+        if current['role'] == 'employer':
+            return owned(ident, current, 'job')
+        job = entity(ident, 'job')
+        if not active_job(job['data']):
+            raise HTTPException(403, '该岗位当前不可访问')
+        return job
+
+    def agent_recruitment(current, selected_job=None):
+        jobs = store.list('job', current['id'])
+        if selected_job:
+            jobs = [job for job in jobs if job['id'] == selected_job]
+        job_map = {job['id']: job for job in jobs}
+        grouped = {ident: {} for ident in job_map}
+        for item in store.list('application'):
+            detail = item['data']
+            if detail.get('withdrawn') or detail.get('job_id') not in job_map:
+                continue
+            stage = detail.get('stage', 'submitted')
+            counts = grouped[detail['job_id']]
+            counts[stage] = counts.get(stage, 0) + 1
+        return {'job_count': len(jobs), 'application_count': sum(sum(counts.values()) for counts in grouped.values()),
+                'scope': '当前企业有效投递，按投递记录计数；不代表去重人数',
+                'jobs': [{**{key: flat(job).get(key) for key in ['id', 'title', 'status', 'version', 'capacity', 'description', 'requirements', 'questions']},
+                          'application_count': sum(grouped[job['id']].values()), 'stages': grouped[job['id']]}
+                         for job in jobs]}
+
     def agent_context_run(ident, current):
         item = owned(ident, current, 'agent_run')
         if item['data'].get('status') != 'completed':
             raise HTTPException(404, '该问答已撤回或未完成，请重新提问')
         if item['data'].get('application_id'):
             application_access(item['data']['application_id'], current)
+        if item['data'].get('job_id'):
+            agent_job_access(item['data']['job_id'], current)
         for doc_id in item['data'].get('document_ids', []):
             document_access(doc_id, current)
         return item
@@ -693,7 +722,11 @@ def create_app(data_root=None, enable_demo=True):
                 raise HTTPException(403, "投递已撤回")
             context["application"] = application_result(item, job)
         if payload.job_id:
-            context["job"] = flat(entity(payload.job_id, "job"))
+            context["job"] = flat(agent_job_access(payload.job_id, current))
+        if current['role'] == 'employer':
+            if payload.application_id and payload.job_id and context['application']['job']['id'] != payload.job_id:
+                raise HTTPException(422, '所选候选人与岗位不一致，请重新选择')
+            context['recruitment'] = agent_recruitment(current, payload.job_id)
         if current["role"] == "university":
             context["insights"] = insights(current)
         from backend.governance import check_model_output, model_gateway
@@ -727,6 +760,8 @@ def create_app(data_root=None, enable_demo=True):
             raise HTTPException(422, str(exc))
         if payload.application_id:
             application_access(payload.application_id, current)
+        if payload.job_id:
+            agent_job_access(payload.job_id, current)
         for ident in payload.document_ids:
             document_access(ident, current)
         for ancestor in ancestors:
@@ -743,6 +778,8 @@ def create_app(data_root=None, enable_demo=True):
             try:
                 if item["data"].get("application_id"):
                     application_access(item["data"]["application_id"], current)
+                if item['data'].get('job_id'):
+                    agent_job_access(item['data']['job_id'], current)
                 for doc_id in item["data"].get("document_ids", []):
                     document_access(doc_id, current)
             except HTTPException as exc:

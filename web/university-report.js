@@ -6,7 +6,7 @@ let prepared=null,active=null;
 let reportReference=null;
 export function selectUniversityReport(kind,id){reportReference={kind,id,owner:state.user.id,epoch:state.sessionEpoch};}
 on('university-selected-report',el=>{selectUniversityReport(el.dataset.kind||'run_id',el.dataset.id);closeDialog();navigate('university');});
-on('report-export',()=>{if(active)exportUniversityReport(active);});
+on('report-export',async()=>{if(active)await exportUniversityReport(active);});
 on('report-recalculate',()=>{
  if(!prepared)return;
  const data=prepared.data;

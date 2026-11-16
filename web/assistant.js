@@ -3,11 +3,12 @@ import {jobEditor} from './workflows.js';
 import {profilePage,bindProfile} from './product.js';
 import {dictateInto} from './voice.js';
 import {createAgentVisual} from './agent-visual.js';
+import {installAgentFiles} from './agent-files.js';
 
 let panel=null;const composerDrafts=new Map();
 export function closeAssistant(){
  const current=panel;panel=null;
- if(current){const input=document.querySelector('#agent-form textarea');if(input&&current.draftKey){composerDrafts.set(current.draftKey,{text:input.value,mode:document.querySelector('#agent-form [name=mode]')?.value});if(composerDrafts.size>20)composerDrafts.delete(composerDrafts.keys().next().value)}current.closed=true;current.controller?.abort();current.visual.dispose();current.observer.disconnect()}
+ if(current){const input=document.querySelector('#agent-form textarea');if(input&&current.draftKey){composerDrafts.set(current.draftKey,{text:input.value,mode:document.querySelector('#agent-form [name=mode]')?.value,documentIds:current.files?.selectedIds()||[]});if(composerDrafts.size>20)composerDrafts.delete(composerDrafts.keys().next().value)}current.closed=true;current.controller?.abort();current.uploadController?.abort();current.visual.dispose();current.observer.disconnect()}
  window.dispatchEvent(new Event('dictation-stop'));
  document.querySelector('#agent-drawer').hidden=true;
 }
@@ -58,6 +59,19 @@ export function openAssistant(context={}){
  drawer.scrollTop=0;
  drawer.querySelector('#agent-form textarea').focus({preventScroll:true});
  const form=drawer.querySelector('#agent-form');
+ current.files=installAgentFiles(form,current,saved?.documentIds||[]);
+ if(state.user.role==='employer'){
+  const sources=document.createElement('div');sources.className='agent-business-sources';
+  const jobs=state.jobs.filter(job=>job.owner===state.user.id);
+  sources.innerHTML=`<label>岗位范围<select name="agent_job"><option value="">本企业全部岗位</option>${jobs.map(job=>`<option value="${e(job.id)}">${e(job.title)}</option>`).join('')}</select></label><label>测评对象<select name="agent_application"><option value="">仅查看招聘概况</option></select></label><small>使用本企业岗位及有效投递统计；选择候选人后读取其已授权测评。文件正文需单独确认。</small>`;
+  navigation.append(sources);
+  const job=sources.querySelector('[name=agent_job]'),application=sources.querySelector('[name=agent_application]');
+  const choices=()=>{const selected=application.value;application.innerHTML='<option value="">仅查看招聘概况</option>'+state.applications.filter(item=>!item.withdrawn&&(!job.value||item.job.id===job.value)).map((item,index)=>`<option value="${e(item.id)}">候选人${index+1} · ${e(item.job.title)}</option>`).join('');if([...application.options].some(option=>option.value===selected))application.value=selected;};
+  job.value=context.job_id||'';choices();application.value=context.application_id||'';
+  const sync=()=>{state.agentContext={...state.agentContext};delete state.agentContext.job_id;delete state.agentContext.application_id;if(job.value)state.agentContext.job_id=job.value;if(application.value)state.agentContext.application_id=application.value;current.setFollowup?.(null)};
+  job.onchange=()=>{choices();sync()};application.onchange=()=>{if(application.value){const item=state.applications.find(item=>item.id===application.value);job.value=item?.job.id||'';}sync()};
+  current.sourceControls=[job,application];
+ }
  const historyToggle=document.createElement('button');historyToggle.type='button';historyToggle.className='agent-history-toggle';historyToggle.textContent='查看历史对话';display.append(historyToggle);
  historyToggle.onclick=()=>{const showing=drawer.dataset.view==='conversation';drawer.dataset.view=showing?(current.controller?'thinking':'composing'):'conversation';historyToggle.textContent=showing?'查看历史对话':current.controller?'返回思考画面':'返回输入画面'};
  if(drawer.dataset.view==='conversation')historyToggle.textContent='返回输入画面';
@@ -87,6 +101,7 @@ export function openAssistant(context={}){
  const keyboardHint=document.createElement('small');keyboardHint.className='agent-keyboard-hint';keyboardHint.textContent='Enter 发送 · Shift+Enter 换行';form.querySelector('.agent-composer-actions').after(keyboardHint);
  drawer.querySelector('#agent-form').addEventListener('submit',async event=>{
   event.preventDefault();if(current.controller||current.retracting)return;
+  if(current.files.busy){toast('文件正在上传，请等待正文提取完成');return;}
   const form=event.currentTarget,text=form.message.value.trim(),mode=form.mode.value;if(!text)return;
   if(speech.classList.contains('recording')||speech.disabled){toast('请先停止录音并核对转写，再提交问题');return;}
   const ids=state.documents.filter(d=>form.elements['doc_'+d.id]?.checked).map(d=>d.id);
@@ -95,12 +110,12 @@ export function openAssistant(context={}){
   const valid=()=>panel===current&&!current.closed&&state.sessionEpoch===epoch&&state.user?.id===userId;
   const parent=current.followup;
   const turn={question:text,mode,context:{...(parent?.turn?.context||state.agentContext)}};
-  const btn=form.querySelector('[type=submit]');btn.disabled=true;speech.disabled=true;modeButtons.forEach(button=>button.disabled=true);btn.textContent='正在思考并回复…';historyToggle.textContent='查看历史对话';drawer.dataset.view='thinking';current.visual.show('thinking');state.messages.push({role:'user',text,turn});paintMessages();
+  const btn=form.querySelector('[type=submit]');btn.disabled=true;speech.disabled=true;modeButtons.forEach(button=>button.disabled=true);current.sourceControls?.forEach(control=>control.disabled=true);btn.textContent='正在思考并回复…';historyToggle.textContent='查看历史对话';drawer.dataset.view='thinking';current.visual.show('thinking');state.messages.push({role:'user',text,turn});paintMessages();
   try{
    const result=await post('/agent/run',{message:text,mode,document_ids:ids,send_documents:form.send_documents?.checked||false,...Object.fromEntries(Object.entries(turn.context).filter(([k])=>k!=='mode')), ...(parent?.result?.id?{parent_run_id:parent.result.id}:{})},{signal:controller.signal});
    if(!valid())return;state.messages.push({role:'assistant',text:result.message,result,turn});state.agentDraft=result.draft;paintMessages();form.message.value='';current.setFollowup(null);drawer.dataset.view='conversation';historyToggle.textContent='返回输入画面';current.visual.show('idle');
   }catch(err){if(valid()&&err.name!=='AbortError'){state.messages.push({role:'error',text:err.message,turn});paintMessages();drawer.dataset.view='conversation';current.visual.show('error')}}
-  finally{sessionRequests.delete(controller);current.controller=null;if(valid()){btn.disabled=false;speech.disabled=false;modeButtons.forEach(button=>button.disabled=false);btn.textContent='发送消息'}}
+  finally{sessionRequests.delete(controller);current.controller=null;if(valid()){btn.disabled=false;speech.disabled=false;modeButtons.forEach(button=>button.disabled=false);current.sourceControls?.forEach(control=>control.disabled=false);btn.textContent='发送消息'}}
  });
 }
 function paintMessages(){

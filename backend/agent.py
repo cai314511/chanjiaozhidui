@@ -46,7 +46,7 @@ def tool_result(name, arguments, context):
             return [{"id": d["id"], "name": d["name"], "sha256": d["sha256"], "blocks": d["blocks"]} for d in docs]
         if section == "overview":
             return {"role": context["role"], "mode": context["mode"], "available": [k for k in context if k not in {"role", "mode"}]}
-        if section not in {"job", "profile", "application", "insights"}:
+        if section not in {"job", "profile", "application", "insights", "recruitment"}:
             raise AgentError("工具请求了未授权的资料类型")
         if section not in context:
             return {"missing": True, "message": "当前会话没有授权此类资料"}
@@ -62,7 +62,7 @@ def tool_result(name, arguments, context):
 
 TOOLS = [
     {"type": "function", "function": {"name": "inspect_authorized_materials", "description": "读取当前登录身份已获授权的资料，先检查overview了解可用内容。",
-        "parameters": {"type": "object", "properties": {"section": {"type": "string", "enum": ["overview", "documents", "job", "profile", "application", "insights"]}}, "required": ["section"], "additionalProperties": False}}},
+        "parameters": {"type": "object", "properties": {"section": {"type": "string", "enum": ["overview", "documents", "job", "profile", "application", "insights", "recruitment"]}}, "required": ["section"], "additionalProperties": False}}},
     {"type": "function", "function": {"name": "calculate_matching", "description": "取得服务端确定性计算的双向匹配分、证据覆盖率、硬条件和权重明细。", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
     {"type": "function", "function": {"name": "inspect_model_rules", "description": "查看数学模型、证据规则和资源约束说明。", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}},
 ]
@@ -90,16 +90,22 @@ curriculum模式在message给出课程调整及所需资源；draft=null。资�
                 {"role": "user", "content": "当前任务模式：" + context["mode"] + "\n" + message}]
     role_guidance = {
         'student': '学生端，围绕职业探索、学习、项目经历与求职准备回答。',
-        'employer': '企业端，围绕岗位职责、招聘规划、候选人和面试评价回答，不把企业用户当作求职学生。',
+        'employer': '企业端，围绕岗位职责、招聘规划、候选人和面试评价回答，不把企业用户当作求职学生。讨论当前企业时读取recruitment取得本企业岗位与有效投递统计；选定岗位读取job，选定投递读取application。不能将未选文档误说成没有企业数据。测评建议需有具体投递的回答证据；未选投递时指引在助手上方选择候选人。不要假设已授权数据缺失，先调用对应工具核对。',
         'university': '高校端，围绕培养目标、课程、师资与实验室资源回答，不把高校用户当作求职学生。',
     }
     messages[0]['content'] += '\n当前登录身份：' + role_guidance.get(context.get('role'), '按用户明确提供的身份回答。')
+    if context.get('documents'):
+        messages[0]['content'] += ('\n用户已经选定文档：处理文件问题先读取documents，再按正文回答并标明原文位置。'
+            '用户限定“只依据上传文件、仅根据所选材料”等范围时，只能使用documents正文，'
+            '不要读取或补充profile、job、application、recruitment、insights。文件没有的内容直接列为缺项，'
+            '不能用个人档案、其他岗位或历史对话中的信息填补。')
     if context['mode'] == 'chat':
         messages[0]['content'] += ('\n当前是聊天咨询模式：正常回应寒暄和通用问题，可以根据用户在问题中提供的信息给出建议。'
             '通用建议明确为通用做法，不假装来自个人材料。不要仅因没有上传文档而回答无法分析用户请求。'
             '需要个性化事实、岗位或学校信息时再调用工具核对授权资料；资料不足时先给出可执行的准备建议，'
             '再询问一个最关键的缺项。需要填写表单时说明适合的专用模式，不要求用户切换模式才能聊天。')
     trace, tokens = [], 0
+    format_repaired = False
     started = time.monotonic()
     try:
         with httpx.Client(timeout=httpx.Timeout(90, connect=15)) as client:
@@ -133,20 +139,29 @@ curriculum模式在message给出课程调整及所需资源；draft=null。资�
                     if len(calls) > 8:
                         raise AgentError("单轮工具请求数量超限")
                     continue
-                result = json.loads(output.get("content") or "")
-                if not isinstance(result.get("message"), str) or not result["message"].strip():
-                    raise AgentError("模型未返回有效说明")
+                try:
+                    result = json.loads(output.get("content") or "")
+                    if not isinstance(result, dict) or not isinstance(result.get('message'), str) or not result['message'].strip():
+                        raise ValueError('缺少有效message')
+                    draft = result.get("draft")
+                    if draft is not None and context["mode"] in {"job", "profile"}:
+                        from backend.schemas import Job, Profile
+                        draft = (Job if context["mode"] == "job" else Profile).model_validate(draft).model_dump()
+                    elif context["mode"] not in {"job", "profile"}:
+                        draft = None
+                except (ValueError, TypeError):
+                    if format_repaired or turn >= 5:
+                        raise AgentError('模型回复经格式修正仍未通过校验，未生成可填写草稿，请补充资料后重试') from None
+                    # 仅允许一次结构修正，仍受原有总时限及工具轮数限制。
+                    format_repaired = True
+                    messages.append({'role': 'assistant', 'content': output.get('content') or ''})
+                    messages.append({'role': 'user', 'content': '上次结果的JSON结构或草稿字段未通过校验。只返回包含有效message和draft的JSON对象，不要Markdown代码围栏。不得为通过校验而编造缺项；资料不足、仅讨论建议或无法形成完整草稿时draft必须为null，并在message说明仍缺什么。请基于已经核对的资料修正，不重复调用工具。'})
+                    continue
                 if re.search(r'(?:权重|weight|公式|贡献分)[^\n]{0,60}\d|Σ|∑|2ES', result['message'], re.I):
                     result['message'] = PARAMETER_REPLY
-                draft = result.get("draft")
-                if draft is not None and context["mode"] in {"job", "profile"}:
-                    from backend.schemas import Job, Profile
-                    draft = (Job if context["mode"] == "job" else Profile).model_validate(draft).model_dump()
-                elif context["mode"] not in {"job", "profile"}:
-                    draft = None
                 return {"message": result["message"], "draft": draft, "trace": trace,
                         "model": config["model"], "tokens": tokens, "elapsed": round(time.monotonic() - started, 2),
-                        "review_status": "pending", "real_model_call": True}
+                        "review_status": "pending", "real_model_call": True, "format_repaired": format_repaired}
     except httpx.HTTPError:
         raise AgentError("DeepSeek网络连接失败，请检查网络后重试") from None
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
