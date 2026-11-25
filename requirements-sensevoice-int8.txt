@@ -1,0 +1,2 @@
+# 可选 SenseVoice INT8 CPU 推理依赖；先安装 requirements.txt。
+sherpa-onnx==2.0.3

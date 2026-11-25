@@ -120,7 +120,12 @@ async function openSession(data){
  else if(!session.interacted&&!recording&&!session.gettingStream&&!session.finishing&&!session.sending&&document.querySelector('.droplet-stage').dataset.mode!=='error')localSpeak(data.messages.filter(m=>m.role==='assistant').at(-1).text,session).catch(showError);
 }
 function showError(err){if(err.name==='AbortError')return;const target=document.querySelector('#voice-error');if(target)target.textContent=err.message;setStatus('error',err.name==='NotAllowedError'?'麦克风权限未开启，请允许访问后重试':'本轮操作未完成，可以重试');}
-async function obtainStream(session){if(stream)return stream;const epoch=captureEpoch,acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});if(!valid(session)||document.hidden||epoch!==captureEpoch){acquired.getTracks().forEach(track=>track.stop());throw new DOMException('访谈已关闭或暂停','AbortError');}stream=acquired;return acquired;}
+async function requestMicrophone(){
+ if(!window.isSecureContext)throw new Error('麦克风需要通过 HTTPS 访问网站，当前可以继续使用文字输入。');
+ if(!navigator.mediaDevices?.getUserMedia)throw new Error('此浏览器无法使用麦克风，请更换浏览器或继续使用文字输入。');
+ return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+}
+async function obtainStream(session){if(stream)return stream;const epoch=captureEpoch,acquired=await requestMicrophone();if(!valid(session)||document.hidden||epoch!==captureEpoch){acquired.getTracks().forEach(track=>track.stop());throw new DOMException('访谈已关闭或暂停','AbortError');}stream=acquired;return acquired;}
 async function startRecording(session){
  if(!valid(session)||document.hidden||recording||session.gettingStream||session.finishing)return;
  session.gettingStream=true;cancelPlayback();try{await obtainStream(session);}finally{session.gettingStream=false;}if(!valid(session))return;
@@ -192,7 +197,7 @@ async function connectHuman(session){
  if(peer||session.connecting)return;
  session.connecting=true;let acquired;
  let network;
- try{network=await api('/interviews/'+session.data.id+'/connectivity');if(!valid(session))return;acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}finally{session.connecting=false;}
+ try{network=await api('/interviews/'+session.data.id+'/connectivity');if(!valid(session))return;acquired=await requestMicrophone();}finally{session.connecting=false;}
  if(!valid(session)){acquired.getTracks().forEach(track=>track.stop());return;}
  callStream=acquired;
  peer=new RTCPeerConnection({iceServers:network.iceServers});callStream.getTracks().forEach(track=>peer.addTrack(track,callStream));
@@ -234,7 +239,7 @@ export async function dictateInto(textarea,trigger,hooks={}){
  if(recording||peer||dictation){toast('请先停止当前录音');return;}
  const value={epoch:state.sessionEpoch,textarea,trigger,hooks,cancelled:false};dictation=value;
  trigger.disabled=true;
- try{value.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}catch(err){if(dictation===value){dictation=null;restoreDictation(value)}throw err;}
+ try{value.stream=await requestMicrophone();}catch(err){if(dictation===value){dictation=null;restoreDictation(value)}throw err;}
  if(dictation!==value||value.epoch!==state.sessionEpoch||!textarea.isConnected){value.stream.getTracks().forEach(track=>track.stop());return;}
  const usable=()=>!value.cancelled&&value.epoch===state.sessionEpoch&&textarea.isConnected;
  value.preview=document.createElement('p');value.preview.className='transcript-interim';value.preview.setAttribute('aria-live','polite');textarea.after(value.preview);

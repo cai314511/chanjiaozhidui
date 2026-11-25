@@ -6,6 +6,20 @@ from playwright.sync_api import expect
 from tests.test_browser import browser_system, register
 
 
+def test_http_microphone_limit_has_https_guidance(browser_system):
+    browser, base = browser_system
+    page = browser.new_page()
+    page.add_init_script("""Object.defineProperty(window, 'isSecureContext', {value: false});
+        Object.defineProperty(navigator, 'mediaDevices', {value: undefined});""")
+    register(page, base, 'student', 'capture-insecure-context')
+    page.locator('#agent-toggle').click()
+    page.locator('.agent-speech').click()
+    expect(page.locator('#agent-orb-status')).to_contain_text('HTTPS')
+    expect(page.locator('#agent-form textarea')).to_be_editable()
+    expect(page.locator('.agent-speech')).to_be_enabled()
+    page.close()
+
+
 @pytest.mark.parametrize('role', ['student', 'employer', 'university'])
 def test_capture_denial_and_transcription_failure_leave_question_editable(browser_system, role):
     browser, base = browser_system

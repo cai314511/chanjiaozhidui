@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from backend import voice
+from tests.test_api import account, system
 
 
 def local_model(tmp_path, monkeypatch):
@@ -40,6 +41,29 @@ def test_legacy_whisper_directory_remains_supported(tmp_path, monkeypatch):
     for name in ('model.bin', 'config.json', 'tokenizer.json'):
         (tmp_path / name).write_text('isolated test fixture')
     assert voice.model_spec() == ('whisper', tmp_path)
+
+
+def test_int8_sensevoice_is_selected_with_its_own_dependencies(tmp_path, monkeypatch):
+    monkeypatch.setenv('CHZ_ASR_MODEL', str(tmp_path))
+    for name in ('model.int8.onnx', 'tokens.txt'):
+        (tmp_path / name).write_text('isolated test fixture')
+    looked_up = []
+
+    def find_spec(name):
+        looked_up.append(name)
+        return object() if name == 'sherpa_onnx' else None
+
+    monkeypatch.setattr(voice.importlib.util, 'find_spec', find_spec)
+    assert voice.model_spec() == ('sensevoice_int8', tmp_path)
+    state = voice.status()
+    assert state['recognition_ready']
+    assert 'INT8' in state['recognition']
+    assert looked_up == ['sherpa_onnx']
+
+    monkeypatch.setattr(voice.importlib.util, 'find_spec', lambda name: None)
+    missing = voice.status()
+    assert missing['recognition_ready'] is False
+    assert 'requirements-sensevoice-int8.txt' in missing['recognition_error']
 
 
 def test_sensevoice_chunking_strips_metadata_and_uses_fresh_cache():
@@ -113,3 +137,21 @@ def test_inference_error_returns_503_and_rejects_unauthenticated_audio(tmp_path,
         response = client.post('/api/voice/transcribe', files=files)
         assert response.status_code == 503
         assert '本地模型不可用' in response.json()['detail']
+
+
+def test_missing_sensevoice_dependency_is_explained_in_status_and_transcription(system, tmp_path, monkeypatch):
+    local_model(tmp_path, monkeypatch)
+    find_spec = voice.importlib.util.find_spec
+    monkeypatch.setattr(voice.importlib.util, 'find_spec', lambda name: None if name == 'funasr' else find_spec(name))
+    client = account(system, 'student', 'missing-sensevoice-dependency')
+    state = client.get('/api/voice/status').json()
+    assert state['recognition_ready'] is False
+    assert 'funasr' in state['recognition_error']
+    assert 'requirements-sensevoice.txt' in state['recognition_error']
+    sample = io.BytesIO()
+    with wave.open(sample, 'wb') as stream:
+        stream.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+        stream.writeframes((np.sin(np.arange(16000) * .1) * 12000).astype('<i2').tobytes())
+    response = client.post('/api/voice/transcribe', files={'file': ('sample.wav', sample.getvalue(), 'audio/wav')})
+    assert response.status_code == 503
+    assert response.json()['detail'] == state['recognition_error']

@@ -64,6 +64,20 @@ git log -1 --oneline
 
 Linux虚拟环境通常为`.venv/bin/python`；如果第1步显示服务用的是其他Python路径，沿用那个环境。不要复制Windows的`.venv`到Linux。`git pull --ff-only`失败时先处理分支或本地修改，不继续重启。
 
+Ubuntu 如果返回 `externally-managed-environment`，为项目建立独立虚拟环境。建议先完成安装和检查，再停止旧进程；启动时将原命令中的 Python 换成新环境的绝对路径，沿用原工作目录和启动参数。
+
+```bash
+python3 -m venv runtime/aws-voice-venv &&
+runtime/aws-voice-venv/bin/python -m pip install -r requirements.txt &&
+runtime/aws-voice-venv/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.6,<3' 'torchaudio>=2.6,<3' &&
+runtime/aws-voice-venv/bin/python -m pip install -r requirements-sensevoice.txt &&
+runtime/aws-voice-venv/bin/python -m pip check
+```
+
+如果创建环境时报 `ensurepip is not available`，先运行 `sudo apt-get update && sudo apt-get install python3-venv`，再执行上面的命令。该安装顺序适用于使用 CPU 推理的 EC2 实例。
+
+如果下载 PyTorch 时出现 `[Errno 122] Disk quota exceeded`，保留已创建的虚拟环境。先用 `df -hT . /tmp` 和 `df -i . /tmp` 查看项目及临时目录所在文件系统，再用 `quota -s`（如系统已安装）检查当前用户配额。项目目录有可用空间和配额时，可创建 `runtime/aws-pip-tmp`，在两条语音依赖安装命令中使用 `TMPDIR="$PWD/runtime/aws-pip-tmp"` 和 `pip install --no-cache-dir` 重试。项目所在文件系统本身达到配额时，须先处理该配额，切换下载临时目录仍无法把依赖装入原环境。
+
 ### 4. 修改项目配置
 
 项目根目录已有`.env`时直接编辑；仅当不存在时才从模板创建：
@@ -140,6 +154,7 @@ curl --silent --output /dev/null --write-out '%{http_code}\n' http://127.0.0.1:8
 
 - XLSX导入、诊断图表、四年决策计算不依赖DeepSeek Key；只有模型助手调用需要有效配置。
 - SenseVoice 转写在 EC2 服务进程中运行。将项目根目录 `.env` 中的 `CHZ_ASR_MODEL` 指向完整的 `models/SenseVoiceSmall` 目录，进程里同名环境变量优先。模型权重在服务器单独保存。在运行 Uvicorn 的同一个 Python 环境中安装 `requirements-sensevoice.txt`，随后沿用原方式重启服务。Whisper 可继续通过配置完整的模型目录使用。
+- 内存较小的 CPU 实例可选 SenseVoiceSmall INT8。安装 `requirements-sensevoice-int8.txt`，将 [Sherpa-ONNX 发布的 SenseVoice INT8 模型](https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html) 的 `model.int8.onnx` 和对应 `tokens.txt` 放进 `models/SenseVoiceSmall-int8`，然后将 `CHZ_ASR_MODEL` 指向该目录。该路径使用单线程 CPU 推理，无需加载 PyTorch 权重。部署前在隔离进程用真实音频转写一次，启动后通过原接口验收。
 - 在项目目录用服务的 Python 执行 `python -c "from backend.voice import status; print(status())"`，确认 `recognition_ready` 为 `True`。再在免登录体验的语音窗口实录一句中文，核对转写内容。首次实际转写成功后，登录态 `/api/voice/status` 的 `recognition_loaded` 应为 `True`。
 - Linux 服务器的 `synthesis_ready: false` 对应浏览器设备朗读。更新代码后点击“重播问题”，使用设备已安装的本地中文语音包。公网麦克风录音需要可信 HTTPS，直接通过 `http://公网IP:8765` 登录时可继续用文字回答。
 - 新版参考包会随Git更新，但应用只为缺失的固定公共记录补齐数据，不覆盖云端已存在的聚合。更新代码不会重算历史数据。服务器若持有两份原始CSV，需要刷新全行业目录或高校需求时，可按原流程分别执行`.venv/bin/python scripts/import_market.py`和`.venv/bin/python scripts/import_demand.py`，缺少默认路径时用`--csv`显式指定；脚本各自先备份。不要把公告条数当招聘人数，也不要把本机账号库复制到云端。
