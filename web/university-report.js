@@ -104,6 +104,7 @@ export async function universityReportPage(){
  const base=data.scenarios.find(s=>s.name==='基准'),match=data.metrics.find(m=>m.id==='match');
  const improvement=match.before!=null&&match.after!=null?match.after-match.before:null;
  const mainAction=data.actions[0];
+ const unfinishedActions=data.actions.filter(action=>!confirmedPlans(action).length).length;
  const simple=Boolean(data.source.optimization_id);
  const cost=data.resources.find(r=>r.id==='cost');
  const conclusion=data.calculation.label;
@@ -116,7 +117,11 @@ export async function universityReportPage(){
  <section class="report-hero"><div class="report-hero-copy"><span class="report-kicker">培养诊断报告 / 四年培养周期</span><div class="report-status" data-calculation-state="${e(data.calculation.state)}"><i></i>${e(data.calculation.label)}</div><h2>${e(conclusion)}</h2><p>${e(data.program?.name||state.user.name+'培养方案')} ${data.program?'· '+e(data.program.region):''}</p><p class="report-hero-detail">${e(data.calculation.reason)}</p>${data.calculation.missing.length?`<p>待补：${data.calculation.missing.map(e).join('；')}</p>`:''}<div class="inline">${button('确认培养方案','route','university-workspace','primary')}${button('查看课程库','university-course-library')}${button('高级方案与假设','route','decision')}</div></div><div class="report-cycle" aria-label="四年培养闭环"><div class="report-cycle-inner"><small>培养与反馈</small><strong>4<span>年</span></strong><p>课程 · 实践 · 毕业跟踪</p></div></div></section>
  <section class="report-executive" aria-label="本轮三项结论"><article><span>培养改善</span><strong>${improvement!=null?amount(improvement)+' 个百分点':simple&&data.actions.length?'已降低录入技能缺口':'等待可比较的改善依据'}</strong><p>${simple?'技能增益以本轮确认假设为准':'基准情景专业与岗位匹配变化'}</p></article><article><span>重点调整</span><strong>${e(adjustment)}</strong><p>${data.actions.length} 项已选培养动作</p></article><article><span>预算与资源</span><strong>${cost?.after!=null?'新增 '+amount(cost.after,0)+' 元':'新增投入待测算'}</strong><p>预算上限 ${amount(cost?.limit,0)} 元；师资与实验室约束见下方</p></article></section>
  ${versionNotice(data)}${constraintDetails(data)}
- <div class="report-source-strip" data-report-reference="${e(data.source.run_id||data.source.optimization_id||'')}"><span>${e(data.source.title||data.metrics_scope)}</span><span>${data.source.created_at?'测算于 '+e(new Date(data.source.created_at).toLocaleString('zh-CN')):'本次读取 '+e(data.generated_at.slice(0,10))}</span><span>${data.program?'当前招生 '+data.program.current_seats+' 人':'尚未登记本专业招生规模'}</span><span>全校课程库 ${amount(data.catalog.total,0)} 门</span></div>
+ <div class="report-source-strip" data-report-reference="${e(data.source.run_id||data.source.optimization_id||'')}">
+ <span>${e(data.source.title||data.metrics_scope)}</span><span>${state.demo?'演示情景 · 课程增益按假设测算':'课程增益按本轮输入测算'}</span>
+ <span>${data.source.created_at?'测算于 '+e(new Date(data.source.created_at).toLocaleString('zh-CN')):'本次读取 '+e(data.generated_at.slice(0,10))}</span>
+ <span>${data.program?'当前招生 '+data.program.current_seats+' 人':'尚未登记本专业招生规模'}</span><span>全校课程库 ${amount(data.catalog.total,0)} 门</span>
+ <span>${mainAction?(unfinishedActions?`${unfinishedActions} 项教学安排待确认：学期、考核与分工`:'已记录教师确认的教学安排'):'请先在培养方案向导完成测算'}</span></div>
  ${simple?`<section class="report-panel"><h3>本轮资源优化结果</h3><p>已使用预算 ${amount(cost.after,0)} / ${amount(cost.limit,0)} 元；${data.actions.length?'选中课程：'+e(data.actions.flatMap(a=>a.added.map(c=>c.name)).join('、')):'当前资源条件下未选中正收益组合'}。</p><div class="report-gain-list">${data.skills.map(s=>`<span>${e(s.name)} 缺口：${amount(s.gap_before)} → ${amount(s.gap_after)} 级</span>`).join('')}</div><p>以上为录入增益假设下的缺口变化。原专业课程、能力基线与课程总学时未提供，保持待补充。</p></section>`:''}
  <div class="report-section-title"><div><span class="report-kicker">01 / 评价总览</span><h3>五个维度，先看调整带来什么</h3></div><span class="report-description">当前依据 → 方案测算</span></div>
  <div class="report-metrics" id="report-metrics">${metricCards(data,base)}</div>

@@ -1,14 +1,15 @@
-import {state,e,fmt,money,api,post,put,on,button,dialog,closeDialog,field,select,check,heading,empty,navigate,values,splitList,num,toast,refresh,getJob,paintBars,badge} from './core.js';
+import {clientId,state,e,fmt,money,api,post,put,on,button,dialog,closeDialog,field,select,check,heading,empty,navigate,values,splitList,num,toast,refresh,getJob,paintBars,badge} from './core.js';
 import {scoreHtml} from './views.js';
 import {dictateInto} from './voice.js';
 import {bindPersistentAllocation} from './recruiting-workflow.js';
 
 function reqRow(r={skill:'',mandatory:false,category:'专业能力'}){return `<tr class="requirement-row"><td><input class="skill-input" name="skill" value="${e(r.skill)}" aria-label="能力名称" required maxlength="60"></td><td><select name="category" aria-label="能力类别">${['专业能力','数字能力','业务能力','综合能力','职业规范','语言技能'].map(c=>`<option ${c===r.category?'selected':''}>${c}</option>`).join('')}</select></td><td><input name="target" type="number" min="1" max="5" step="0.5" value="${r.target??3}" aria-label="目标熟练度" required></td><td><input name="weight" type="number" min="0" max="100" value="${r.weight??1}" aria-label="能力权重" required></td><td><input name="mandatory" type="checkbox" ${r.mandatory?'checked':''} aria-label="必要能力条件"></td><td>${button('移除','remove-row','','small')}</td></tr>`;}
-function questionRow(q={id:crypto.randomUUID().slice(0,8),title:'',kind:'scenario',skill:'',rubric:''}){return `<div class="question-row" data-qid="${e(q.id)}"><div class="grid3">${field('题目标识（复核时引用）','qid',q.id,'text','readonly')}<div class="field"><label>测评形式<select name="kind">${Object.entries({scenario:'工作场景模拟',text:'文字考题',voice:'语音对话'}).map(([key,label])=>`<option value="${key}" ${q.kind===key?'selected':''}>${label}</option>`).join('')}</select></label></div>${field('对应能力名称','qskill',q.skill,'text','required')}</div>${field('考题 / 工作场景','qtitle',q.title,'textarea','required maxlength="4000"')}${field('1–5级评分标准与观察要点','rubric',q.rubric,'textarea','required maxlength="4000"')}<div class="inline">${button('移除题目','remove-question','','small')}</div></div>`;}
+function questionRow(q={id:clientId().slice(0,8),title:'',kind:'scenario',skill:'',rubric:''}){return `<div class="question-row" data-qid="${e(q.id)}"><div class="grid3">${field('题目标识（复核时引用）','qid',q.id,'text','readonly')}<div class="field"><label>测评形式<select name="kind">${Object.entries({scenario:'工作场景模拟',text:'文字考题',voice:'语音对话'}).map(([key,label])=>`<option value="${key}" ${q.kind===key?'selected':''}>${label}</option>`).join('')}</select></label></div>${field('对应能力名称','qskill',q.skill,'text','required')}</div>${field('考题 / 工作场景','qtitle',q.title,'textarea','required maxlength="4000"')}${field('1–5级评分标准与观察要点','rubric',q.rubric,'textarea','required maxlength="4000"')}<div class="inline">${button('移除题目','remove-question','','small')}</div></div>`;}
 export function jobEditor(draft=null){
  const j=draft||{title:'',industry:state.industry||'',city:'',work_mode:'现场',salary_min:'',salary_max:'',capacity:1,description:'',training_cost:0,mentor_hours:0,requirements:[{skill:'',target:3,weight:20,mandatory:false,category:'专业能力'}],questions:[],hard:{majors:[],schools:[],languages:[]}};
  dialog('发布岗位与测评',`<form id="job-form"><div class="grid2">${field('岗位名称','title',j.title,'text','required maxlength="120"')}${field('所属赛道，可选择或输入','industry',j.industry,'text','required maxlength="100" list="job-track-options"')}<datalist id="job-track-options"></datalist>${field('工作城市','city',j.city,'text','required maxlength="40"')}${select('工作方式','work_mode',['现场','混合','远程'],j.work_mode)}${field('月薪下限（元）','salary_min',j.salary_min,'number','required min="0"')}${field('月薪上限（元）','salary_max',j.salary_max,'number','required min="0"')}${field('招聘名额','capacity',j.capacity,'number','required min="1" max="10000"')}${field('每位学生培训预算（元）','training_cost',j.training_cost,'number','required min="0"')}${field('每位学生导师投入（课时）','mentor_hours',j.mentor_hours,'number','required min="0" step="0.5"')}</div>${field('岗位JD、工作内容与培养目标','description',j.description,'textarea','required maxlength="30000"')}<h3>能力要求与初始权重</h3><p class="hint">至少填写一项能力。权重会自动归一化；必要能力不允许通过其他高分补偿。软性能力需要配置对应测评。</p><div class="table-wrap"><table><thead><tr><th>能力名称</th><th>类别</th><th>目标等级</th><th>权重</th><th>必要</th><th>操作</th></tr></thead><tbody id="requirements">${j.requirements.map(reqRow).join('')}</tbody></table></div>${button('＋ 添加能力','add-requirement')}<h3 class="small-title">必要背景条件（留空表示不限制）</h3><div class="grid3">${field('允许的专业，逗号分隔','majors',j.hard.majors.join('，'))}${field('允许的院校，逗号分隔','schools',j.hard.schools.join('，'))}${field('要求的语言资格，逗号分隔','languages',j.hard.languages.join('，'))}</div><h3 class="small-title">考题、语音与场景模拟</h3><p class="hint">题目将对学生公开。每道题关联一项岗位能力，并说明评分标准；企业可以引用题目标识核实该能力。</p><div id="questions">${j.questions.map(questionRow).join('')}</div>${button('＋ 添加测评题','add-question')}<p class="error-text" id="job-error"></p><div class="form-actions">${button('取消','close-modal')}<button type="submit" class="btn primary">确认并发布岗位</button></div></form>`);
  const jobForm=document.querySelector('#job-form');
+ jobForm.querySelector('[data-action=add-question]').insertAdjacentHTML('afterend',button('补齐待测评能力','fill-missing-questions','','small'));
  const epoch=state.sessionEpoch;
  Promise.all([api('/market/tracks'),api('/company/profile')]).then(([tracks,company])=>{if(!jobForm.isConnected||epoch!==state.sessionEpoch)return;jobForm.querySelector('#job-track-options').innerHTML=[...new Set([...company.tracks,...tracks.map(t=>t.name)])].map(t=>`<option value="${e(t)}"></option>`).join('');if(!jobForm.industry.value&&company.tracks.length)jobForm.industry.value=company.tracks[0];}).catch(error=>{if(jobForm.isConnected)document.querySelector('#job-error').textContent='赛道建议暂未载入，可直接填写：'+error.message;});
  jobForm.querySelector('h3').textContent='岗位需要的能力';jobForm.querySelector('h3 + p').textContent='目标熟练度：1了解概念、2需指导完成、3独立完成、4处理复杂任务、5指导他人与改进方法；可保留半级。权重0–100，合计须大于零。必要能力发布前必须配置对应题目与评分标准，草稿允许待补。';
@@ -37,6 +38,25 @@ on('assessment-history',async el=>{
  dialog('测评版本记录',records.length?records.map(row=>`<section class="panel"><h3>岗位版本 ${row.job_version}</h3><small>${e(row.saved_at)}</small>${Object.entries(row.answers).map(([qid,answer])=>`<div class="source-block"><span>${e(qid)}</span><p>${e(answer)}</p></div>`).join('')}${row.review?Object.entries(row.review.abilities).map(([skill,obs])=>`<p class="pre">${e(skill)} · ${obs.level}级\n${e(obs.evidence)}</p>`).join(''):'<p class="hint">此版本尚未复核</p>'}</section>`).join(''):empty('尚无历史测评','修改回答或复核时，原始证据将保留为版本记录。'));
 });
 on('new-job',()=>jobEditor());on('add-requirement',()=>document.querySelector('#requirements').insertAdjacentHTML('beforeend',reqRow()));on('remove-row',el=>el.closest('tr').remove());on('add-question',()=>document.querySelector('#questions').insertAdjacentHTML('beforeend',questionRow()));on('remove-question',el=>el.closest('.question-row').remove());
+on('fill-missing-questions',el=>{
+ const form=el.closest('form');
+ const covered=new Set([...form.querySelectorAll('[name=qskill]')].map(field=>field.value.trim()));
+ const needed=[...form.querySelectorAll('.requirement-row')].flatMap(row=>{
+  const skill=row.querySelector('[name=skill]').value.trim();
+  return skill&&(row.querySelector('[name=mandatory]').checked||Number(row.querySelector('[name=weight]').value)>0)?[skill]:[];
+ });
+ const missing=[...new Set(needed)].filter(skill=>!covered.has(skill));
+ if(!missing.length){toast(needed.length?'岗位能力已有对应题目':'先填写需要测评的岗位能力');return;}
+ const host=form.querySelector('#questions');
+ const slots=30-host.querySelectorAll('.question-row').length;
+ if(missing.length>slots){toast('最多可设置 30 道题，请先整理已有题目');return;}
+ host.insertAdjacentHTML('beforeend',missing.map(skill=>questionRow({
+  id:clientId().slice(0,8),skill,kind:'scenario',
+  title:`请结合一个使用「${skill}」解决问题的例子，说明你的步骤、判断依据和验证结果。`,
+  rubric:'1级：能解释基础概念；2级：在指导下完成；3级：独立完成常规任务；4级：能处理复杂情况并验证结果；5级：能总结和改进方法。'
+ })).join(''));
+ toast('已补齐 '+missing.length+' 道草稿，请核对题目与评分标准后保存。');
+});
 on('job-detail',el=>{const j=getJob(el.dataset.id);dialog(j.title,`<div class="chips"><span class="tag">${e(j.industry)}</span><span class="tag">${e(j.city)}</span><span class="tag">${e(j.work_mode)}</span></div><p class="salary">${money(j.salary_min)}–${money(j.salary_max)} / 月</p><p class="pre">${e(j.description)}</p><h3>岗位需要的能力</h3>${j.requirements.map(r=>`<div class="rank-item"><div><strong class="subtle">${e(r.skill)}</strong><p class="hint">${e(r.category)}</p></div>${r.mandatory?'<span class="tag blue">必要条件</span>':''}</div>`).join('')}<h3 class="small-title">背景条件</h3>${Object.entries(j.hard).map(([k,v])=>`<p class="hint">${{majors:'专业',schools:'院校',languages:'语言'}[k]}：${e(v.join('、')||'不限')}</p>`).join('')}<h3 class="small-title">测评任务</h3>${j.questions.length?j.questions.map(q=>`<div class="question"><h4>${e(q.title)}</h4><small>${e(q.skill)}</small><p class="hint">${e(q.rubric)}</p></div>`).join(''):'<p class="hint">企业尚未发布测评题。</p>'}`);});
 
 function abilityRow(skill='',obs={level:0,evidence:''}){return `<tr class="ability-row"><td><input name="ability" class="skill-input" value="${e(skill)}" placeholder="如：产品设计" aria-label="能力名称" required></td><td><input name="level" type="number" min="0" max="5" step="0.5" value="${obs.level}" aria-label="自述等级" required></td><td><input name="evidence" value="${e(obs.evidence)}" placeholder="经历、项目或文档位置" aria-label="能力依据"></td><td>${button('移除','remove-row','','small')}</td></tr>`;}
@@ -68,8 +88,13 @@ on('apply-dialog',async el=>{
 on('application-detail',async el=>{
  const a=await api('/applications/'+el.dataset.id),portfolio=await Promise.all((a.portfolio_ids||[]).map(id=>api('/portfolio/'+id)));
  dialog('匹配与资料',`<h3>${e(a.job.title)}</h3>${scoreHtml(a.match)}${state.user.role==='employer'?`<details><summary>查看已授权学生介绍</summary><p class="pre">专业：${e(a.profile.major)}\n院校：${e(a.profile.school_name)}\n语言：${e(a.profile.language)}\n职业规划：${e(a.profile.career)}\n经历：${e(a.profile.experience)}</p></details>`:''}<h4 class="small-title">已授权资料</h4>${a.document_ids.map(id=>button('查看资料 '+id.slice(0,8),'document',id,'small')).join(' ')||'<p class="hint">未选择文档</p>'}${portfolio.length?'<h4 class="small-title">作品与视频</h4>'+portfolio.map(item=>`<section class="panel"><h4>${e(item.name)}</h4>${item.mime.startsWith('video/')?`<video controls preload="metadata" class="portfolio-video" src="/api/portfolio/${item.id}/file"></video>`:item.mime.startsWith('audio/')?`<audio controls src="/api/portfolio/${item.id}/file"></audio>`:item.mime.startsWith('image/')?`<img class="portfolio-image" src="/api/portfolio/${item.id}/file" alt="${e(item.name)}">`:`<a class="btn small" href="/api/portfolio/${item.id}/file" target="_blank" rel="noopener">查看作品</a>`}</section>`).join(''):''}<details><summary>测评回答与复核记录</summary>${Object.entries(a.answers||{}).map(([qid,answer])=>`<div class="source-block"><span>${e(qid)}</span><p>${e(answer)}</p></div>`).join('')}${(a.audio_ids||[]).map(id=>`<audio controls src="/api/audio/${e(id)}"></audio>`).join('')}${a.review?`<p class="hint">企业已复核；变更回答后需要重新核实。</p>${Object.entries(a.review.abilities).map(([skill,obs])=>`<p class="pre">${e(skill)}\n${e(obs.evidence)}</p>`).join('')}`:'<p class="hint">尚未完成企业复核</p>'}</details>`);
+ if(state.user.role==='employer'&&!a.withdrawn){
+  document.querySelector('#modal-content > h3').insertAdjacentHTML('afterend',`<div class="inline"><p class="hint">
+  ${a.student_chosen?'学生已表达意向':'等待学生表达意向'} · ${a.employer_chosen?'企业已表达意向':'等待企业表达意向'}</p>
+  ${button(a.employer_chosen?'取消企业意向':'确认企业意向','choice',a.id,'small primary')}${button('测评复核','review',a.id,'small')}</div>`);
+ }
 });
-on('choice',async el=>{const a=state.applications.find(a=>a.id===el.dataset.id);const chosen=state.user.role==='employer'?a.employer_chosen:a.student_chosen;await post('/applications/'+a.id+'/choice',{chosen:!chosen});await refresh();closeDialog();navigate('applications');toast(chosen?'已取消选择':'已记录选择');});
+on('choice',async el=>{const a=state.applications.find(a=>a.id===el.dataset.id);if(!a)throw new Error('该投递已更新，请返回候选人列表');const next=state.route==='allocation'?'allocation':'applications';const chosen=state.user.role==='employer'?a.employer_chosen:a.student_chosen;await post('/applications/'+a.id+'/choice',{chosen:!chosen});await refresh();closeDialog();navigate(next);toast(chosen?'已取消意向':'已记录意向');});
 on('withdraw',el=>dialog('撤回投递',`<p>撤回后，该企业将立即失去当前投递资料与测评的访问权限。</p><div class="form-actions">${button('取消','close-modal')}${button('确认撤回','confirm-withdraw',el.dataset.id,'danger')}</div>`));
 on('confirm-withdraw',async el=>{await post('/applications/'+el.dataset.id+'/withdraw',{});await refresh();closeDialog();navigate('applications');toast('投递已撤回');});
 
@@ -104,6 +129,7 @@ on('record',async el=>{if(recorder?.state==='recording'){recorder.stop();el.text
 document.querySelector('#modal').addEventListener('close',()=>{if(recorder?.state==='recording')recorder.stop();recorderStream?.getTracks().forEach(t=>t.stop());});
 
 on('review',async el=>{
+ const next=state.route==='allocation'?'allocation':'applications';
  const a=await api('/applications/'+el.dataset.id);
  const proofs=await Promise.all(a.document_ids.map(id=>api('/documents/'+id)));
  const questions=a.job.questions.map(q=>`<div class="question"><h4>${e(q.title)}</h4><small>${e(q.id)} · ${e(q.skill)}</small><p class="hint">标准：${e(q.rubric)}</p><p class="pre">${e(a.answers[q.id]||'尚未回答')}</p></div>`).join('');
@@ -115,7 +141,9 @@ on('review',async el=>{
   event.preventDefault();const form=event.currentTarget,abilities={},background={};
   form.querySelectorAll('.review-row').forEach((row,i)=>{if(form.elements['review_'+i].checked)abilities[row.dataset.skill]={level:num(form.elements['level_'+i].value),evidence:form.elements['evidence_'+i].value};});
   for(const key of ['majors','schools','languages','graduation_month','degree','academic_status'])if(form.elements['bg_'+key])background[key]=form.elements['bg_'+key].checked;
-  try{await post('/applications/'+a.id+'/review',{revision:a.revision,abilities,background});await refresh();closeDialog();navigate('applications');toast('复核已保存，匹配分已重新计算');}catch(err){document.querySelector('#review-error').textContent=err.message;}
+  const submit=form.querySelector('[type=submit]');submit.disabled=true;
+  try{await post('/applications/'+a.id+'/review',{revision:a.revision,abilities,background});await refresh();closeDialog();navigate(next);toast('复核已保存，匹配分已重新计算');}catch(err){form.querySelector('#review-error').textContent=err.message;}
+  finally{submit.disabled=false;}
  });
 });
 

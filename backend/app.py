@@ -684,8 +684,11 @@ def create_app(data_root=None, enable_demo=True):
             stage = detail.get('stage', 'submitted')
             counts = grouped[detail['job_id']]
             counts[stage] = counts.get(stage, 0) + 1
-        return {'job_count': len(jobs), 'application_count': sum(sum(counts.values()) for counts in grouped.values()),
-                'scope': '当前企业有效投递，按投递记录计数；不代表去重人数',
+        open_jobs = [j for j in jobs if active_job(j['data'])]
+        return {'job_count': len(jobs), 'open_job_count': len(open_jobs),
+                'open_job_application_count': sum(sum(grouped[j['id']].values()) for j in open_jobs),
+                'application_count': sum(sum(counts.values()) for counts in grouped.values()),
+                'scope': '当前企业有效投递按记录计数。招聘中岗位数与包含草稿、暂停、结束状态的岗位总数分别统计。',
                 'jobs': [{**{key: flat(job).get(key) for key in ['id', 'title', 'status', 'version', 'capacity', 'description', 'requirements', 'questions']},
                           'application_count': sum(grouped[job['id']].values()), 'stages': grouped[job['id']]}
                          for job in jobs]}

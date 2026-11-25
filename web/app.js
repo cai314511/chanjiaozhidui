@@ -1,4 +1,4 @@
-import {state,actions,e,roleNames,api,post,on,navigate,refresh,toast,paintBars,sessionRequests} from './core.js';
+import {state,actions,e,roleNames,api,post,on,navigate,refresh,toast,paintBars,sessionRequests,button} from './core.js';
 import {jobs,applications,documentsPage,allocationPage,auth} from './views.js';
 import {bindAllocation,bindJobActions} from './workflows.js';
 import {profilePage,bindProfile,weightsPage,loadWeights,guidancePage,appendPortfolio,inputHub,installInputHelpers} from './product.js';
@@ -30,7 +30,7 @@ routes['university-workspace']=['◈','培养方案向导'];
 function allowed(){
  const role=state.user?.role;
  routes.home[1]=role==='university'?'需求研判中心':role==='employer'?'招聘总览':'探索首页';
- routes.documents[1]=role==='university'?'本校培养资料库':'资料与证据库';
+ routes.documents[1]=role==='university'?'本校培养资料库':'资料库';
  routes.jobs[1]=role==='university'?'岗位需求证据':role==='employer'?'岗位管理':'岗位与能力';
  routes.applications[1]=role==='employer'?'候选人管理':'投递与双向选择';
  routes.allocation[1]=role==='employer'?'招聘分析与分配':'招聘资源分配';
@@ -42,6 +42,22 @@ function allowed(){
 }
 function shell(){return `<div class="shell"><aside class="sidebar" id="sidebar"><a class="brand" href="#home" data-action="route" data-id="home"><span class="brand-mark" aria-hidden="true"><img src="/assets/product-logo.png" alt="" width="1254" height="1254"></span><div><h2>智链产教</h2><small>连接产业与人才成长</small></div></a><div class="nav-label">${state.user?roleNames[state.user.role]+' / 工作空间':'探索 / 产教协同'}</div><nav class="nav" aria-label="主导航">${allowed().map(k=>`<button class="${state.route===k?'active':''}" data-action="route" data-id="${k}"><span class="nav-icon">${routes[k][0]}</span>${routes[k][1]}</button>`).join('')}</nav><div class="sidebar-foot"><div class="status"><span class="dot ${state.health.agent_configured?'live':'off'}"></span>${state.health.agent_configured?'DeepSeek · 已配置':'DeepSeek · 待配置'}</div><small>发现方向 · 展示经历 · 双向选择</small><div class="account"><span class="avatar">${state.user?e(state.user.name.slice(0,1)):'访'}</span><div class="account-info"><strong>${state.user?e(state.user.name):'访客'}</strong><small>${state.user?roleNames[state.user.role]:'登录后进入工作空间'}</small></div><button class="logout" data-action="${state.user?'logout':'login'}">${state.user?'退出':'登录'}</button></div></div></aside><main class="main"><header class="topbar"><div class="inline"><button class="mobile-menu" data-action="mobile-menu" aria-label="切换导航">☰</button><span class="breadcrumb">智链产教　/　${routes[state.route]?.[1]||'探索首页'}</span></div><div class="topbar-right"><span class="tag">产业 × 人才成长</span>${state.user?'<span class="status"><span class="dot live"></span>本地工作空间</span>':'<button class="text-button" data-action="register">注册 / 登录 ↗</button>'}</div></header><div class="page" id="page-content"><div class="loading">正在读取工作空间</div></div><footer class="footnote"><span>智链产教 · 基于岗位技能证据与资源约束的高校专业调整决策系统</span><span>兴趣探索 → 双向选择 → 培养决策</span></footer></main></div>`;}
 let renderSequence=0;
+const coreNavigation={
+ employer:['home','jobs','applications','allocation','messages','company','documents'],
+ student:['home','jobs','applications','profile','my-space','curriculum','messages','documents'],
+ university:['home','university-workspace','university','decision','documents']
+};
+const pageLinks={
+ employer:{applications:[['favorites','人才收藏'],['students','公开学生主页']],documents:[['evidence','产业资料']]},
+ student:{jobs:[['students','公开学生主页']],documents:[['evidence','产业资料']]},
+ university:{home:[['jobs','岗位需求证据'],['evidence','产业资料'],['students','公开学生主页']],
+  'university-workspace':[['curriculum','课程组合优化']],
+  documents:[['research','产业资料管理']],decision:[['rules','管理与审查']]}
+};
+function workspaceLinks(){
+ const links=pageLinks[state.user?.role]?.[state.route]?.filter(([key])=>allowed().includes(key));
+ return links?.length?`<div class="workspace-page-links inline">${links.map(([key,label])=>button(label,'route',key,'small')).join('')}</div>`:'';
+}
 async function render(){
  const sequence=++renderSequence;
  bindRoleMascots();
@@ -53,7 +69,16 @@ async function render(){
  if(document.querySelector('#app').dataset.identity!==identity||!document.querySelector('.shell')){
   document.querySelector('#app').innerHTML=shell();document.querySelector('#app').dataset.identity=identity;
   document.querySelector('.nav [data-id="model"]')?.replaceChildren(document.createTextNode('⊙　使用帮助'));
-  document.querySelector('.sidebar-foot>small').textContent='发现方向 · 了解彼此 · 双向选择';
+  const core=coreNavigation[state.user?.role];
+  if(core){
+   const shown=state.publicDemo?['home','decision','research','evidence']:core;
+   const nav=document.querySelector('.nav');
+   const links=new Map([...nav.querySelectorAll('[data-id]')].map(control=>[control.dataset.id,control]));
+   nav.replaceChildren(...shown.map(key=>links.get(key)).filter(Boolean));
+  }
+  document.querySelector('.sidebar-foot>small').remove();
+  document.querySelector('.footnote').remove();
+  if(state.demo)document.querySelector('.topbar-right .status')?.remove();
   document.querySelector('.topbar-right').insertAdjacentHTML('afterbegin','<button class="btn small" data-action="commands" aria-label="搜索功能">⌕ 搜索功能</button>');
  }
  document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.id===state.route));
@@ -67,7 +92,7 @@ async function render(){
   let html;
   switch(state.route){
    case'admin':html=await administrationPage();break;
-   case'home':html=state.user?.role==='university'?await universityIntelligencePage():state.user?.role==='employer'?await recruitingHome()+await evidenceTeaser():await discoveryHome()+await evidenceTeaser();break;
+   case'home':html=state.user?.role==='university'?await universityIntelligencePage():state.user?.role==='employer'?await recruitingHome():await discoveryHome()+(state.user?'':await evidenceTeaser());break;
    case'company':html=await companyPage();break;
    case'favorites':html=await candidatesPage(true);break;
    case'messages':html=await messagesPage();break;
@@ -83,13 +108,13 @@ async function render(){
    case'university-workspace':html=await universityWorkspacePage();break;
    case'curriculum':html=await curriculumPage();break;
    case'documents':html=state.user?.role==='university'?await universityMaterialsPage():await documentsPage();break;
-   case'research':html=await evidenceTeaser()+await researchDataPage();break;
+   case'research':html=await researchDataPage();break;
    case'decision':html=await decisionPage();break;
    case'rules':html=await rulesPage();break;
    default:html=guidancePage();
   }
   if(sequence!==renderSequence)return;
-  document.querySelector('#page-content').innerHTML=demoToolbar()+html;
+  document.querySelector('#page-content').innerHTML=demoToolbar()+workspaceLinks()+html;
   if(!state.user)document.querySelector('.discovery-hero .inline')?.insertAdjacentHTML('beforeend','<button class="btn gold-btn" data-action="demo-enter">免登录体验三端</button>');
   bindRoleMascots();
   bindProfile();bindAllocation();bindJobActions();bindCompetition();await bindCurriculum();await bindEvidence();bindMySpace();await bindDiscovery();

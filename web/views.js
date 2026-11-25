@@ -28,14 +28,25 @@ export function weightsPage(){
 }
 
 export async function documentsPage(){
- const statuses=await api('/data/status');
- return heading('资料与证据库','先在本地提取正文；主动点击智能分析后，所选正文才会发送至 DeepSeek。',button('＋ 上传资料','upload','','primary'))+
- `<div class="grid2"><div class="panel"><h3>我的资料</h3><p class="hint">支持 DOCX、PDF、TXT、CSV、XLSX，单份不超过12MB。成绩单、培养方案、JD、案例、行业资料均可上传。</p>${state.documents.length?state.documents.map(d=>`<div class="document"><div class="document-icon">${e(d.name.split('.').pop().toUpperCase())}</div><div><h4>${e(d.name)}</h4><small>${fmt(d.characters)} 字符 · ${e(d.created.slice(0,10))}</small></div>${button('查看正文','document',d.id,'small')}</div>`).join(''):empty('暂无资料','上传真实材料，建立可追溯的分析依据。')}</div><div class="panel"><h3>桌面产业数据</h3><p class="hint">下载中的文件保持原状。压缩包完成后，可列出内容并选择单个文件导入，避免一次展开全部数据。</p>${statuses.length?statuses.map(d=>`<div class="document"><div class="document-icon">ZIP</div><div><h4>${e(d.name)}</h4><small>${fmt(d.bytes/1024/1024)} MB · ${e(d.status)}</small></div>${d.readable?button('查看内容','archive',d.name,'small'):'<span class="tag">下载中</span>'}</div>`).join(''):'<p class="hint">桌面暂未发现相关压缩包。</p>'}</div></div>`;
+ const archives=state.demo?[]:await api('/data/status');
+ const list=state.documents.map(d=>`<div class="document"><div class="document-icon">${e(d.name.split('.').pop().toUpperCase())}</div>
+ <div><h4>${e(d.name)}</h4><small>${fmt(d.characters)} 字符 · ${e(d.created.slice(0,10))}</small></div>${button('查看正文','document',d.id,'small')}</div>`).join('');
+ return heading('资料库','',button('＋ 上传资料','upload','','primary'))+
+ `<section class="panel">${list||empty('暂无资料','支持 DOCX、PDF、TXT、CSV、XLSX，单份不超过 12 MB。')}</section>
+ ${archives.length?`<details class="panel"><summary>从服务器已有压缩包导入</summary>${archives.map(d=>`<div class="document"><div><h4>${e(d.name)}</h4>
+ <small>${fmt(d.bytes/1024/1024)} MB · ${e(d.status)}</small></div>${d.readable?button('查看内容','archive',d.name,'small'):'<span class="tag">下载中</span>'}</div>`).join('')}</details>`:''}`;
 }
 
 export function modelPage(){return heading('评分与决策依据','每次匹配返回原始权重、归一化权重、证据状态与版本，支持复算。')+`<div class="grid2"><article class="panel"><h3>企业如何评价能力</h3><p class="hint">每项能力目标为1–5级，权重由企业设置。超额能力不会补偿其他能力的缺口。</p><div class="model-formula">aᵢ = wᵢ / Σwᵢ<br>uᵢ = min(1, sᵢ / rᵢ)<br>E = 100 × Σaᵢuᵢ</div><p class="hint">自述得到暂定分。已复核证据形成可确认贡献；未核实能力给出上下界与覆盖率。单项权重为零时不计分，必要条件继续生效。</p></article><article class="panel"><h3>学生如何选择岗位</h3><p class="hint">薪资、城市、行业、工作方式与成长目标分别计算适合程度，学生可以自行调整偏好权重。</p><div class="model-formula">S = 100 × Σbⱼvⱼ<br>B = 2ES / (E + S)</div><p class="hint">双向分采用调和平均。双方均为零时结果为零。必要条件独立检查，未满足条件的组合不进入正式分配。</p></article><article class="panel"><h3>行为表现如何获得证据</h3><p class="hint">责任感、好奇心、协作能力等维度使用公开评分标准的场景题或结构化访谈。AI给出证据与评分草稿，企业必须引用已作答题目完成复核。语音文本经学生确认后提交。</p></article><article class="panel"><h3>资源如何影响培养方案</h3><p class="hint">整数规划同时检查预算、学分、师资、实验室、学生学习时间与期限。收益以能力缺口为上限，同一缺口不会因多门课程重复覆盖而无限增加。课程增益由使用者明确录入，属于情景假设。</p></article></div><p class="hint">模型版本 matching-1 · 等级标准：1了解概念，2指导下完成操作，3独立完成常规任务，4解决复杂问题，5设计与创新。</p>`;}
 
-export function allocationPage(){return heading('招聘资源分配','在双方已选择、证据核验完整且必要条件通过的候选对中计算分配建议。')+`<form id="allocation-form" class="panel"><h3>本次招聘资源上限</h3><div class="grid3">${field('月度薪资总预算（元）','salary','','number','min="0" required')}${field('培训总预算（元）','training','','number','min="0" required')}${field('导师可投入总课时','mentor','','number','min="0" required')}</div><p class="hint">每位学生最多分配一个岗位，每个岗位不超过名额。薪资使用岗位薪资上限测算；培训成本与导师课时使用岗位录入值。</p><button class="btn primary" type="submit">计算分配建议</button></form><div id="allocation-result"></div>`;}
+export function allocationPage(){
+ return heading('招聘资源分配')+`<section id="allocation-readiness" class="panel">正在读取候选人状态…</section>
+ <form id="allocation-form" class="panel"><h3>本次招聘资源上限</h3>
+ ${state.demo?`<div class="inline">${button('填入标准预算','plan-budget-example','150000','small')}${button('填入紧缩预算','plan-budget-example','30000','small')}</div>`:''}
+ <div class="grid3">${field('月度薪资总预算（元）','salary','','number','min="0" step="0.01" required')}${field('培训总预算（元）','training','','number','min="0" step="0.01" required')}${field('导师可投入总课时','mentor','','number','min="0" step="0.01" required')}</div>
+ <p class="hint"></p><button class="btn primary" type="submit">计算分配建议</button><p class="hint" role="status"></p></form>
+ <div id="allocation-result"></div>`;
+}
 
 on('enter-role',el=>{if(!state.user){auth('register',el.dataset.id);return;}if(state.user.role!==el.dataset.id){auth('login',el.dataset.id);return;}navigate(state.user.role==='student'?'profile':state.user.role==='employer'?'jobs':'university');});
 on('go-jobs',()=>navigate('jobs'));

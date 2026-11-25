@@ -93,15 +93,37 @@ function paint(session){
   };
  }
 }
-async function openSession(data){
+async function mountVoiceOrb(session,stage,module){
+ const fallback=stage.querySelector('.droplet');
+ const showFallback=()=>{
+  if(!valid(session))return;
+  waterOrb?.dispose();waterOrb=null;
+  stage.replaceChildren(fallback);
+  stage.dataset.render='fallback';
+ };
+ const {WaterOrb}=await module;
+ if(!valid(session))return;
+ if(!WaterOrb){showFallback();return;}
+ try{
+  waterOrb=new WaterOrb(stage);
+  waterOrb.setMode(stage.dataset.mode);
+  stage.addEventListener('water-error',showFallback,{once:true});
+ }catch(error){
+  console.warn('语音水滴使用兼容显示',error);
+  showFallback();
+ }
+}
+async function openSession(request){
+ const module=import('./water-orb.js').catch(error=>{
+  console.warn('无法加载三维水滴',error);
+  return {};
+ });
+ const data=await request;
  stopVoice();active={data,epoch:state.sessionEpoch,draftKey:state.user.id+':'+data.id};const session=active;
  dialog(data.mode==='profile'?'聊聊你的经历':data.mode==='human'?'企业真人面试':'岗位语音面试',`<div class="interview-layout"><div><div class="droplet-stage" data-mode="idle"><div class="droplet" aria-hidden="true"></div></div><div id="voice-status" class="voice-status" role="status">${data.mode==='human'?'等待双方接通':'已准备好，本地识别与播报'}</div><div class="voice-controls"><button class="mic-button" id="voice-mic" aria-label="开始或停止录音">◉</button><button class="btn" id="voice-replay">重播问题</button>${data.mode==='human'?'<button class="btn" id="human-connect">接通音频</button>':''}</div><p class="voice-state-note">${data.mode==='human'?'真人音频直接连接双方设备':'音频在本机处理 · 转写可修改'}</p><label class="check"><input type="checkbox" id="voice-auto"><span>连续对话：停顿后自动发送本轮转写</span></label>${['ai','profile'].includes(data.mode)?'<label class="check"><input type="checkbox" id="voice-consent"><span>同意将本次核对的转写发给 DeepSeek，用于面试追问</span></label>':''}</div><div><div id="voice-messages" class="voice-messages" aria-live="polite"></div><div class="field"><label>本轮实时转写，可直接修改<textarea id="voice-transcript" class="voice-transcript" placeholder="开始说话，识别结果会出现在这里…" maxlength="6000"></textarea></label></div><div class="inline"><button class="btn primary" id="voice-send">确认并回答</button><button class="btn" id="voice-summary">整理为个人介绍</button></div><p class="hint" id="voice-error"></p></div></div><audio id="remote-audio" autoplay controls hidden></audio>`);
  modal().classList.add('voice-dialog');arrangeVoice(modal());paint(session);
  document.querySelector('.voice-state-note').textContent=data.mode==='human'?'真人音频直接连接双方设备':'录音发送至本站服务识别 · 转写可修改';
  document.querySelector('#voice-transcript').value=transcriptDrafts.get(session.draftKey)||'';
- const interactionRoot=modal().querySelector('.interview-layout');
- interactionRoot.addEventListener('pointerdown',()=>session.interacted=true,{once:true});
- interactionRoot.addEventListener('keydown',()=>session.interacted=true,{once:true});
  const preview=document.createElement('p');preview.id='voice-interim';preview.className='transcript-interim';preview.setAttribute('aria-live','polite');document.querySelector('#voice-transcript').closest('.field').append(preview);
  document.querySelector('#voice-mic').onclick=()=>{(recording?pauseRecording():startRecording(session)).catch(showError)};
  document.querySelector('#voice-send').onclick=()=>sendTurn(session).catch(showError);
@@ -111,13 +133,12 @@ async function openSession(data){
   const transcript=session.data.messages.map(m=>(m.role==='user'?'我：':'访谈：')+m.text).join('\n');
   closeDialog();openAssistant({mode:'profile'});const textarea=document.querySelector('#agent-form [name=message]');if(textarea)textarea.value='请根据以下访谈整理我的经历与职业画像，未知信息保持空白，提供待确认草稿：\n'+transcript;
  };
- try{const {WaterOrb}=await import('./water-orb.js');if(!valid(session))return;const stage=document.querySelector('.droplet-stage');waterOrb=new WaterOrb(stage);waterOrb.setMode(stage.dataset.mode||'idle');stage.addEventListener('water-error',event=>showError(new Error(event.detail)),{once:true})}catch(err){if(valid(session))showError(new Error('三维水滴无法启动，请检查浏览器硬件加速。语音与文字功能仍可使用。'))}
- if(!valid(session))return;
+ mountVoiceOrb(session,modal().querySelector('.droplet-stage'),module);
  if(data.mode==='human'){
   document.querySelector('#human-connect').onclick=()=>connectHuman(session).catch(showError);
   const hangup=document.createElement('button');hangup.id='human-disconnect';hangup.className='btn';hangup.textContent='挂断音频';hangup.onclick=()=>disconnectHuman(session).catch(showError);document.querySelector('#human-connect').after(hangup);
  }
- else if(!session.interacted&&!recording&&!session.gettingStream&&!session.finishing&&!session.sending&&document.querySelector('.droplet-stage').dataset.mode!=='error')localSpeak(data.messages.filter(m=>m.role==='assistant').at(-1).text,session).catch(showError);
+ else localSpeak(data.messages.filter(m=>m.role==='assistant').at(-1).text,session).catch(showError);
 }
 function showError(err){if(err.name==='AbortError')return;const target=document.querySelector('#voice-error');if(target)target.textContent=err.message;setStatus('error',err.name==='NotAllowedError'?'麦克风权限未开启，请允许访问后重试':'本轮操作未完成，可以重试');}
 async function requestMicrophone(){
@@ -166,15 +187,15 @@ async function sendTurn(session){
 on('voice-intro',async()=>{
  if(!state.user){toast('请登录后开始交谈');return;}
  if(state.user.role!=='student'){openAssistant({mode:state.user.role==='employer'?'job':'curriculum'});toast('可以通过助手的本地语音按钮说明目标');return;}
- const data=await post('/interviews',{mode:'profile'});await openSession(data);
+ await openSession(post('/interviews',{mode:'profile'}));
 });
 on('interview',async el=>{
  const applicationId=el.dataset.id;
  if(state.user.role==='employer'){const sessions=await api('/interviews');dialog('面试会话',sessions.filter(s=>s.application_id===applicationId).map(s=>`<div class="document"><div><h4>${s.mode==='human'?'真人面试':s.mode==='preset'?'预设问题':'AI面试'}</h4><small>${e(s.created.slice(0,16))}</small></div>${button('进入会话','join-interview',s.id)}</div>`).join('')||'<p class="hint">等待学生创建面试会话。学生可以在投递记录中选择真人面试。</p>');return;}
  dialog('选择面试方式',`<div class="voice-options">${[['ai','AI 面试官','围绕岗位与经历追问，语音本地处理，转写确认后交给 DeepSeek。'],['preset','企业预设问题','按企业提供的问题回答，可用语音或文字。'],['human','真人面试官','创建会话后等待企业加入，双方直接进行音频交流。']].map(([mode,title,description])=>`<button class="btn" data-action="start-interview" data-id="${mode}" data-application="${e(applicationId)}"><strong>${title}</strong><span>${description}</span></button>`).join('')}</div>`);
 });
-on('start-interview',async el=>{const data=await post('/interviews',{mode:el.dataset.id,application_id:el.dataset.application});await openSession(data);});
-on('join-interview',async el=>openSession(await api('/interviews/'+el.dataset.id)));
+on('start-interview',el=>openSession(post('/interviews',{mode:el.dataset.id,application_id:el.dataset.application})));
+on('join-interview',el=>openSession(api('/interviews/'+el.dataset.id)));
 
 async function sendSignal(session,kind,payload){
  const callId=session.callId;

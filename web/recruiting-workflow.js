@@ -56,27 +56,98 @@ on('invitation-reschedule',async el=>{const data=await api('/recruiting/workflow
 on('offer-candidate',el=>{dialog('发出正式录用意向',`<form id="workflow-form">${field('意向说明与条件','message','','textarea','required maxlength="4000"')}<p class="hint">学生接受后系统预留岗位名额。企业随后确认录用；列表阶段标签不代表正式录用。</p><p class="error-text" role="alert"></p><button class="btn primary" type="submit">发出正式意向</button></form>`);bindWorkflowForm(form=>post('/recruiting/applications/'+el.dataset.id+'/offers',{message:form.elements.message.value}));});
 for(const [prefix,actions] of [['invitation',['accept','decline','cancel']],['offer',['accept','decline','confirm','revoke']]])for(const action of actions)on(prefix+'-'+action,async el=>{await post('/recruiting/'+(prefix==='offer'?'offers':'invitations')+'/'+el.dataset.id+'/respond',{action,revision:el.closest('[data-workflow-revision]').dataset.workflowRevision});await refresh();dialog('招聘安排已更新',await workflowPanel());});
 
-function candidatePlan(c){return `<article class="workflow-plan-candidate"><strong>${e(c.student_name)} · ${e(c.job_title)}</strong><span class="tag">${c.selected?'建议入选':'未选中'}</span><p class="hint">${e(c.reasons.join('；')||'双方选择且证据核验通过')}</p><p class="hint">技能缺口：${e(c.skill_gaps.map(g=>g.skill+' '+(g.gap===null?'待核实':g.gap+'级')).join('；')||'暂无可核验技能')}</p></article>`;}
+function candidatePlan(c,actions=false){
+ const cost=c.resource_cost;
+ const gaps=c.skill_gaps.filter(g=>g.gap===null||g.gap>0);
+ return `<article class="workflow-plan-candidate"><strong>${e(c.student_name)} · ${e(c.job_title)}</strong>
+ <p class="hint">${e(c.reasons.join('；')||'双向意向与测评复核通过')}${c.selected&&c.match_score!=null?' · 核验匹配 '+fmt(c.match_score)+'%':''}</p>
+ ${c.selected&&cost?`<p class="hint">月薪 ${fmt(cost.salary)} 元 · 培训 ${fmt(cost.training)} 元 · 导师 ${fmt(cost.mentor)} 课时</p>`:''}
+ ${gaps.length?`<p class="hint">技能缺口：${e(gaps.map(g=>g.skill+' '+(g.gap===null?'待核实':g.gap+'级')).join('；'))}</p>`:''}
+ ${actions?button('邀约与正式意向','application-workflow',c.application_id,'small'):''}</article>`;
+}
 function budgetSummary(plan){
  if(plan.budget_scope!=='total')return '<p class="hint">历史计划采用新增预算口径；重新计算将按企业总预算生成新版本。</p>';
  const labels={salary:'月度薪资（元）',training:'培训（元）',mentor:'导师（课时）'};
  return `${plan.status==='overcommitted'?`<p class="error-text" role="alert">既有承诺已超过企业总预算，暂停新增分配。缺额：${Object.entries(plan.budget_shortfall).filter(([,v])=>v>0).map(([k,v])=>e(labels[k])+' '+fmt(v)).join('；')}。请增加预算或处理原意向，系统不会自动撤销录用。</p>`:''}<div class="table-wrap"><table><thead><tr><th>资源</th><th>企业总预算</th><th>既有承诺</th><th>可用于新增</th><th>新增建议</th><th>合计占用</th></tr></thead><tbody>${Object.entries(labels).map(([k,label])=>`<tr><td>${e(label)}</td><td>${fmt(plan.budget[k])}</td><td>${fmt(plan.committed[k])}</td><td>${fmt(plan.remaining_budget[k])}</td><td>${fmt(plan.result.used[k])}</td><td>${fmt(plan.total_used[k])}</td></tr>`).join('')}</tbody></table></div><details><summary>查看已接受意向与已录用承诺（${plan.commitments.length}人）</summary>${plan.commitments.map(c=>`<p>${e(c.student_name)} · ${e(c.job_title)} · ${c.status==='hired'?'已录用':'已接受'} · 原岗位版本 v${c.job_version}：薪资 ${fmt(c.resources.salary)}、培训 ${fmt(c.resources.training)}、导师 ${fmt(c.resources.mentor)}课时</p>`).join('')||'<p>暂无既有承诺</p>'}</details>`;
 }
-function planCard(plan){return `<section class="panel"><div class="section-head"><h3>招聘计划 v${plan.version}</h3><span class="tag">${plan.stale?'来源已变化 · 请重新计算':'当前来源版本'}</span></div>${budgetSummary(plan)}<p>新增建议入选 ${plan.result.selected.length} 人；新增占用薪资 ${fmt(plan.result.used.salary)}、培训 ${fmt(plan.result.used.training)}、导师 ${fmt(plan.result.used.mentor)}课时。</p><p class="hint">岗位剩余名额：${plan.jobs.map(j=>e(j.title)+' '+j.capacity).join('；')||'暂无开放岗位'}</p>${plan.candidates.map(candidatePlan).join('')||empty('暂无候选人','有效投递后可计算计划。')}<p class="hint">计划仅提供分配建议；录用需要通过正式意向和企业确认。</p></section>`;}
+function planCard(plan,actions=false){
+ const selected=plan.candidates.filter(c=>c.selected),remaining=plan.candidates.filter(c=>!c.selected);
+ const exportLink=actions?`<a class="btn small" href="/api/recruiting/plans/${encodeURIComponent(plan.id)}/export" download>导出计划 Excel</a>`:'';
+ const capacity=plan.jobs.map(job=>e(job.title)+' '+(job.capacity-selected.filter(c=>c.job_id===job.id).length)).join('；');
+ return `<section class="panel" id="${actions?'plan-'+e(plan.id):''}">
+ <div class="section-head"><div><h3>招聘计划 v${plan.version}</h3><p class="hint">${plan.stale?'来源已变化，请重算后执行':'按当前岗位与候选资料计算'}</p></div>${exportLink}</div>
+ <h4>新增建议入选 ${selected.length} 人</h4>
+ ${selected.map(c=>candidatePlan(c,actions&&!plan.stale)).join('')||'<p class="hint">本版没有新增名单。请查看下方预算与未入选原因。</p>'}
+ ${budgetSummary(plan)}
+ <p class="hint">建议分配后剩余名额：${capacity||'暂无开放岗位'}</p>
+ ${remaining.length?`<details><summary>待办与未入选（${remaining.length} 条）</summary>${remaining.map(c=>candidatePlan(c)).join('')}</details>`:''}
+ </section>`;
+}
+async function loadReadiness(){
+ const host=document.querySelector('#allocation-readiness');
+ if(!host)return;
+ const data=await api('/recruiting/plans/readiness');
+ if(!host.isConnected)return;
+ const pending=data.blocked.filter(c=>c.status==='pending');
+ const choices=data.blocked.filter(c=>c.status==='eligible'&&c.student_chosen&&!c.employer_chosen);
+ const queue=[...choices,...pending];
+ host.innerHTML=`<div class="section-head"><div><h3>可纳入分配 ${data.eligible_students} 人</h3>
+ <p>开放岗位 ${data.open_jobs} 个 · 投递记录 ${data.application_count} 条 · 可计算的候选人–岗位组合 ${data.eligible_pairs} 条</p></div>
+ ${button('候选人管理','route','applications','small')}</div>
+ ${!data.application_count?'<p>收到第一份授权投递后，系统会在这里给出复核待办。</p>':''}
+ ${Object.keys(data.reasons).length?`<details ${!data.eligible_students?'open':''}><summary>查看待办与排除原因</summary>
+ <ul>${Object.entries(data.reasons).map(([reason,count])=>`<li>${e(reason)} · ${count} 条</li>`).join('')}</ul>
+ ${queue.length?`<div>${queue.slice(0,6).map(c=>`<div class="rank-item"><span>${e(c.student_name)} · ${e(c.job_title)}</span>${c.status==='pending'?button('测评复核','review',c.application_id,'small'):button('查看并确认意向','application-detail',c.application_id,'small')}</div>`).join('')}</div>
+ ${queue.length>6?button('查看其余候选人','route','applications','small'):''}`:''}</details>`:''}`;
+}
+let planLoad=0;
 export async function loadPlans(){
  const host=document.querySelector('#allocation-result');if(!host)return;
- const epoch=state.sessionEpoch,plans=await api('/recruiting/plans');if(!host.isConnected||epoch!==state.sessionEpoch)return;
+ const sequence=++planLoad,epoch=state.sessionEpoch,plans=await api('/recruiting/plans');
+ if(!host.isConnected||epoch!==state.sessionEpoch||sequence!==planLoad)return;
  const form=document.querySelector('#allocation-form');
  if(plans.length)for(const key of ['salary','training','mentor'])if(!form.elements[key].value)form.elements[key].value=plans[0].budget[key];
- host.innerHTML=`${plans.length>1?`<section class="panel"><h3>比较两个计划版本</h3><div class="inline"><label>原版本<select id="plan-left">${plans.map((p,i)=>`<option value="${p.id}" ${i===1?'selected':''}>v${p.version}</option>`).join('')}</select></label><label>新版本<select id="plan-right">${plans.map(p=>`<option value="${p.id}">v${p.version}</option>`).join('')}</select></label>${button('比较版本','compare-plans','','primary')}</div></section><div id="plan-comparison"></div>`:''}${plans.map(planCard).join('')||empty('暂无已保存计划','填写资源上限后计算，计划和候选依据会按版本保存。')}`;
+ host.innerHTML=`${plans.length>1?`<section class="panel"><h3>比较两个计划版本</h3><div class="inline"><label>原版本<select id="plan-left">${plans.map((p,i)=>`<option value="${p.id}" ${i===1?'selected':''}>v${p.version}</option>`).join('')}</select></label><label>新版本<select id="plan-right">${plans.map(p=>`<option value="${p.id}">v${p.version}</option>`).join('')}</select></label>${button('比较版本','compare-plans','','primary')}</div></section><div id="plan-comparison"></div>`:''}
+ ${plans.length?planCard(plans[0],true):empty('暂无已保存计划','填写资源上限后计算。')}
+ ${plans.length>1?`<details class="panel"><summary>历史计划（${plans.length-1} 版）</summary>${plans.slice(1).map(plan=>planCard(plan,true)).join('')}</details>`:''}`;
 }
 export function bindPersistentAllocation(){
  const form=document.querySelector('#allocation-form');if(!form)return;
  form.querySelector('h3').textContent='企业招聘总预算';
  for(const [key,label] of Object.entries({salary:'企业月度薪资总预算（元）',training:'企业培训总预算（元）',mentor:'企业导师课时总上限'}))form.elements[key].closest('label').firstChild.textContent=label;
- form.querySelector('.hint').textContent='先扣除已接受意向与已录用的承诺，再分配剩余预算。承诺按原岗位版本的薪资上限及培训、导师投入保留；撤销后释放，不重复计入同一人。';
+ form.querySelector('.hint').textContent='先扣除已接受意向与已录用占用的资源，再安排新增名额。薪资按岗位上限测算。';
  form.querySelector('[type=submit]').textContent='计算并保存新版本';
- form.addEventListener('submit',async event=>{event.preventDefault();const submit=form.querySelector('[type=submit]');submit.disabled=true;try{await post('/recruiting/plans',Object.fromEntries(['salary','training','mentor'].map(k=>[k,Number(form.elements[k].value)])));await loadPlans();toast('招聘计划新版本已保存');}catch(error){toast(error.message);}finally{submit.disabled=false;}});
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();const submit=form.querySelector('[type=submit]'),status=form.querySelector('[role=status]');
+  submit.disabled=true;status.textContent='正在计算招聘计划…';
+  try{
+   const plan=await post('/recruiting/plans',Object.fromEntries(['salary','training','mentor'].map(k=>[k,Number(form.elements[k].value)])));
+   await loadPlans();
+   status.textContent='已保存招聘计划 v'+plan.version;
+   document.getElementById('plan-'+plan.id)?.scrollIntoView({block:'start'});
+  }catch(error){status.textContent=error.message;}
+  finally{submit.disabled=false;}
+ });
  loadPlans().catch(error=>toast(error.message));
+ loadReadiness().catch(error=>{const host=document.querySelector('#allocation-readiness');if(host)host.textContent=error.message;});
 }
-on('compare-plans',async()=>{const result=await api('/recruiting/plans/compare?left='+encodeURIComponent(document.querySelector('#plan-left').value)+'&right='+encodeURIComponent(document.querySelector('#plan-right').value));document.querySelector('#plan-comparison').innerHTML=`<section class="panel"><h3>v${result.left.version} → v${result.right.version}</h3><p>${Object.entries(result.budget_changes).map(([k,v])=>({salary:'薪资',training:'培训',mentor:'导师'}[k])+': '+fmt(v.before)+' → '+fmt(v.after)).join('；')||'预算保持一致'}</p><h4>新增入选</h4>${result.added.map(candidatePlan).join('')||'<p class="hint">无</p>'}<h4>移出建议</h4>${result.removed.map(candidatePlan).join('')||'<p class="hint">无</p>'}<details><summary>查看两版全部候选人、岗位、名额与未选原因</summary>${planCard(result.left)}${planCard(result.right)}</details></section>`;});
+on('plan-budget-example',el=>{
+ const form=el.closest('form');
+ Object.entries({salary:el.dataset.id,training:20000,mentor:240}).forEach(([key,value])=>{form.elements[key].value=value;});
+ form.elements.salary.focus();
+});
+on('compare-plans',async()=>{
+ const left=document.querySelector('#plan-left').value,right=document.querySelector('#plan-right').value;
+ const host=document.querySelector('#plan-comparison');
+ if(left===right){host.textContent='请选择两个不同版本。';return;}
+ const result=await api('/recruiting/plans/compare?'+new URLSearchParams({left,right}));
+ if(!host.isConnected)return;
+ const moved=rows=>rows.map(c=>candidatePlan(c)).join('')||'<p class="hint">无</p>';
+ const after=new Map(result.right.candidates.map(candidate=>[candidate.application_id,candidate]));
+ const removed=result.removed.map(candidate=>after.get(candidate.application_id)||{
+  ...candidate,selected:false,reasons:['新版本未包含此投递']
+ });
+ host.innerHTML=`<section class="panel"><h3>v${result.left.version} → v${result.right.version} · 建议人数 ${result.left.result.selected.length} → ${result.right.result.selected.length}</h3>
+ <p>${Object.entries(result.budget_changes).map(([key,v])=>({salary:'月薪预算',training:'培训预算',mentor:'导师课时'}[key])+' '+fmt(v.before)+' → '+fmt(v.after)).join('；')||'预算保持一致'}</p>
+ <h4>新增入选</h4>${moved(result.added)}<h4>移出建议</h4>${moved(removed)}</section>`;
+});

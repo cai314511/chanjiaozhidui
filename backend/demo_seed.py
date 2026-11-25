@@ -10,6 +10,18 @@ from backend.store import encode, now
 
 
 REFERENCE = Path(__file__).resolve().parents[1] / 'data/demo-reference/reference.json.gz'
+ASSESSMENT_EXAMPLE = {
+    'Python': ('python', '如何用 Python 清洗岗位数据并验证处理结果？',
+               '先校验列类型和空值，再按岗位、公司和日期去重。保留异常行和原始行号，用测试样本对比处理前后的计数。'),
+    '数据分析': ('analysis', '如何判断试点招聘流程是否提高了筛选效率？',
+                 '按岗位分组比较上线前后单份投递平均筛选时间、进入面试比例和复核分歧，记录样本量并检查岗位构成是否变化。'),
+    '产品设计': ('scenario', '如何设计一个可核对引用来源的研究助手？',
+                 '先定义研究任务，再约束资料来源，生成后逐条检查引用和关键数据。'),
+    '沟通协作': ('coordination', '用人部门和人事对岗位标准意见不同，如何推进？',
+                 '先用两份样例简历对齐必需能力和可培养能力，记录分歧和负责人，在下一轮复核会上确认规则。'),
+    'SQL': ('sql', '如何同时统计各岗位投递量与去重候选人数？',
+            '只筛选有效投递，按岗位分组。分别使用 COUNT(*) 与 COUNT(DISTINCT student_id)，把不同岗位的同一学生纳入各岗位计数。'),
+}
 
 
 def seed_workspace(store):
@@ -23,7 +35,8 @@ def seed_workspace(store):
     company = '星澜数智科技'
     store.save('company_profile', main['employer'], {'name': company, 'tracks': ['人工智能', '金融科技', '数字内容'],
                'city': '北京', 'description': '面向金融研究和数字内容团队，提供智能体产品、数据分析和AI视频工作流服务。中央财经大学产教协作项目组。'}, 'demo-company')
-    profiles = store.list('profile')
+    usernames = {account['id']: username for username, account in accounts.items()}
+    profiles = sorted(store.list('profile'), key=lambda item: usernames[item['owner']])
     for i, item in enumerate(profiles):
         profile = item['data']
         if item['owner'] == main['student']:
@@ -73,13 +86,16 @@ def seed_workspace(store):
                 'strengths': ['Python', '数据分析', '产品设计'], 'links': [], 'document_ids': [document_id], 'portfolio_ids': works}
         store.save('student_page', item['owner'], {'draft': page, 'published': {**page, 'published_at': stamp}}, 'student_page:'+item['owner'])
     titles = ['AI产品经理', '投研智能体产品实习生', 'AI视频工作流工程师', '金融数据分析师', 'Python应用开发', '用户研究实习生', '产品运营专员', '机器学习工程师']
+    questions = [{'id': ident, 'title': title, 'skill': skill,
+                  'rubric': '说明操作步骤、判断依据和验证方式，再按能力等级复核。', 'kind': 'scenario'}
+                 for skill, (ident, title, _) in ASSESSMENT_EXAMPLE.items()]
     for i, title in enumerate(titles):
         data = Job(title=title, industry='金融科技' if i % 2 else '人工智能', city='北京' if i % 3 else '上海',
                    salary_min=6000+i*1500, salary_max=10000+i*2000, capacity=3+i % 4,
                    work_mode='混合', description='参与智能体与数据产品建设，负责需求梳理、方案设计和项目交付。\n与研究、设计和研发团队协作，关注可追溯证据与用户体验。',
                    training_cost=2000, mentor_hours=12,
                    requirements=[{'skill': skill, 'target': 3+(i+j) % 3*.5, 'weight': 1+j, 'category': '专业能力'} for j, skill in enumerate(SKILLS)],
-                   questions=[{'id': 'scenario', 'title': '如何设计一个可核对引用来源的研究助手？', 'skill': '产品设计', 'rubric': '说明用户任务、数据来源、异常处理与验证方法。', 'kind': 'scenario'}]).model_dump()
+                   questions=questions).model_dump()
         data.update(company=company, version=1, status='published' if i<5 else ['paused','draft','closed'][i-5])
         store.save('job', main['employer'], data, 'demo-job-'+str(i))
         text='# '+title+'\n\n'+data['description']+'\n\n工作城市：'+data['city']+'\n\n能力要求：'+'、'.join(SKILLS)
@@ -92,10 +108,18 @@ def seed_workspace(store):
         for j in range(3):
             job_id = 'demo-job-'+str((i+j) % 5)
             docs = ['resume-'+item['owner']]
-            review = {'abilities': item['data']['abilities'], 'background': {}, 'reviewed_at': stamp} if i % 3 else None
+            completed = i in (1, 2, 3, 4) and j == 0
+            answers = {ident: answer for ident, _, answer in ASSESSMENT_EXAMPLE.values()} if j == 0 else {
+                'scenario': ASSESSMENT_EXAMPLE['产品设计'][2]}
+            review = None
+            if completed:
+                review = {'abilities': {skill: {'level': 3 + (i % 3) * .5,
+                    'evidence': f'{ident}：{answer}'} for skill, (ident, _, answer) in ASSESSMENT_EXAMPLE.items()},
+                    'background': {}, 'reviewed': True, 'reviewer': main['employer'], 'reviewed_at': stamp}
             store.save('application', item['owner'], {'job_id': job_id, 'consent': True, 'document_ids': docs,
                        'portfolio_ids': [f'work-{i}-0'], 'withdrawn': False, 'student_chosen': True,
-                       'employer_chosen': i % 4 == 0, 'answers': {'scenario': '先定义研究任务，再约束资料来源，生成后逐条检查引用和关键数据。'},
+                       'employer_chosen': completed or i % 4 == 0, 'answers': answers,
+                       'answers_job_version': 1, 'answer_questions': questions,
                        'audio_ids': [], 'review': review, 'stage': ['new','reviewing','interview','offer'][i % 4]}, f'application-{i}-{j}')
     school = store.list('university_profile', main['university'])[0]
     for document in store.list('document',main['university']):

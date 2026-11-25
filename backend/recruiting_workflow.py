@@ -1,6 +1,7 @@
 """招聘邀约、正式意向与持久招聘计划。状态变更和名额检查共用 SQLite 写事务。"""
 import hashlib
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal
@@ -308,6 +309,71 @@ def attach_recruiting_workflow(app, store, user, application_result):
         if current['role'] != 'employer':
             raise HTTPException(403, '仅企业可以管理招聘计划')
 
+    def candidate_pool(db, job_items, application_items):
+        committed_students = {data['student_id'] for row in db.execute(
+            "SELECT data FROM entities WHERE kind='recruiting_offer'").fetchall()
+            if (data := json.loads(row['data']))['status'] in {'accepted', 'hired'}}
+        by_id = {job['id']: job for job in job_items}
+        jobs = {job['id']: {**job['data'], 'id': job['id'],
+                          'capacity': max(0, job['data']['capacity'] - occupancy(db, job['id']))}
+                for job in job_items if active_job(job['data'])}
+        candidates, pairs = [], []
+        for item in application_items:
+            application = item['data']
+            job = by_id[application['job_id']]
+            student = db.execute('SELECT name FROM users WHERE id=?', (item['owner'],)).fetchone()
+            candidate = {'application_id': item['id'], 'student_id': item['owner'], 'student_name': student['name'],
+                         'job_id': job['id'], 'job_title': job['data']['title'], 'job_version': job['data']['version'],
+                         'requirements': job['data']['requirements'], 'assessment': None, 'profile': {},
+                         'skill_gaps': [], 'status': 'excluded', 'ready': False, 'selected': False}
+            candidates.append(candidate)
+            if application.get('withdrawn'):
+                candidate['reasons'] = ['投递已撤回']
+                continue
+            result = application_result(item, job)
+            match = result['match']
+            reasons = []
+            if item['owner'] in committed_students:
+                reasons.append('该学生已有已接受或已录用的意向')
+            if job['id'] not in jobs:
+                reasons.append('岗位未开放')
+            elif not jobs[job['id']]['capacity']:
+                reasons.append('岗位无剩余名额')
+            if application.get('stage') == 'declined':
+                reasons.append('企业标记不合适')
+            if match['status'] != 'eligible':
+                reasons.append('必要条件或测评证据尚未全部核验' if match['status'] == 'pending' else '必要条件不符合')
+            if not (application.get('student_chosen') and application.get('employer_chosen')):
+                reasons.append('双方尚未同时表达意向')
+            candidate.update(assessment=application.get('review'), profile=result['profile'],
+                             skill_gaps=[{'skill': detail['skill'], 'gap': detail['gap']}
+                                         for detail in match['employer']['details']],
+                             status=match['status'], reasons=reasons, ready=not reasons,
+                             match_score=match['lower'], employer_chosen=bool(application.get('employer_chosen')),
+                             student_chosen=bool(application.get('student_chosen')),
+                             resource_cost=resource_cost(job['data']))
+            if candidate['ready']:
+                pairs.append({'application_id': item['id'], 'job_id': job['id'], 'student_id': item['owner'],
+                              'status': 'eligible', 'lower': match['lower'], 'mutual': True})
+        return jobs, candidates, pairs
+
+    @app.get('/api/recruiting/plans/readiness')
+    def readiness(current=Depends(user)):
+        employer(current)
+        with store.connect() as db:
+            db.execute('BEGIN')
+            _, jobs, applications = source_snapshot(current, db)
+            active, candidates, eligible = candidate_pool(db, jobs, applications)
+        fields = ('application_id', 'student_name', 'job_title', 'status', 'reasons',
+                  'employer_chosen', 'student_chosen')
+        current_candidates = [candidate for candidate in candidates if candidate['reasons'] != ['投递已撤回']]
+        blocked = [{key: candidate.get(key) for key in fields} for candidate in current_candidates if not candidate['ready']]
+        return {'application_count': len(current_candidates), 'open_jobs': len(active),
+                'eligible_students': len({pair['student_id'] for pair in eligible}),
+                'eligible_pairs': len(eligible),
+                'reasons': dict(Counter(reason for candidate in blocked for reason in candidate['reasons'])),
+                'blocked': blocked}
+
     @app.get('/api/recruiting/plans')
     def plans(current=Depends(user)):
         employer(current)
@@ -326,41 +392,31 @@ def attach_recruiting_workflow(app, store, user, application_result):
             remaining = {key: float(max(Decimal(0), difference[key])) for key in total_budget}
             shortfall = {key: float(max(Decimal(0), -difference[key])) for key in total_budget}
             overcommitted = any(shortfall.values())
-            committed_students = {d['student_id'] for row in db.execute("SELECT data FROM entities WHERE kind='recruiting_offer'").fetchall() if (d := json.loads(row['data']))['status'] in {'accepted', 'hired'}}
-            jobs = {j['id']: {**j['data'], 'id': j['id'], 'capacity': max(0, j['data']['capacity'] - occupancy(db, j['id']))} for j in job_items if active_job(j['data'])}
-            candidates, pairs = [], []
-            for item in application_items:
-                job = next(j for j in job_items if j['id'] == item['data']['job_id'])
-                student = db.execute('SELECT name FROM users WHERE id=?', (item['owner'],)).fetchone()
-                if item['data'].get('withdrawn'):
-                    candidates.append({'application_id': item['id'], 'student_id': item['owner'], 'student_name': student['name'],
-                                       'job_id': job['id'], 'job_title': job['data']['title'], 'job_version': job['data']['version'],
-                                       'requirements': job['data']['requirements'], 'assessment': None, 'profile': {},
-                                       'skill_gaps': [], 'status': 'excluded', 'reasons': ['投递已撤回'], 'selected': False})
-                    continue
-                result = application_result(item, job)
-                reasons = []
-                if overcommitted: reasons.append('既有承诺已超过企业总预算，请先调整预算或处理原意向')
-                if item['owner'] in committed_students: reasons.append('该学生已有已接受或已录用的意向')
-                if job['id'] not in jobs: reasons.append('岗位未开放')
-                if item['data'].get('stage') == 'declined': reasons.append('企业标记不合适')
-                if result['match']['status'] != 'eligible': reasons.append('必要条件或测评证据尚未全部核验' if result['match']['status'] == 'pending' else '必要条件不符合')
-                mutual = item['data'].get('student_chosen') and item['data'].get('employer_chosen')
-                if not mutual: reasons.append('双方尚未同时表达意向')
-                details = result['match'].get('employer', {}).get('details', [])
-                candidates.append({'application_id': item['id'], 'student_id': item['owner'], 'student_name': student['name'],
-                                   'job_id': job['id'], 'job_title': job['data']['title'], 'job_version': job['data']['version'],
-                                   'requirements': job['data']['requirements'], 'assessment': item['data'].get('review'),
-                                   'profile': result['profile'], 'skill_gaps': [{'skill': d['skill'], 'gap': d['gap']} for d in details],
-                                   'status': result['match']['status'], 'reasons': reasons})
-                if not reasons:
-                    pairs.append({'application_id': item['id'], 'job_id': job['id'], 'student_id': item['owner'], 'status': 'eligible',
-                                  'lower': result['match']['lower'], 'mutual': True})
-            result = allocate(pairs, jobs, remaining)
+            jobs, candidates, pairs = candidate_pool(db, job_items, application_items)
+            try:
+                result = allocate([] if overcommitted else pairs, jobs, remaining)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            selection = set(result['selected'])
+            chosen = [candidate for candidate in candidates if candidate['application_id'] in selection]
+            chosen_students = {candidate['student_id'] for candidate in chosen}
+            chosen_counts = Counter(candidate['job_id'] for candidate in chosen)
+            balances = {key: difference[key] - Decimal(str(result['used'][key])) for key in total_budget}
+            resource_labels = {'salary': '月度薪资预算', 'training': '培训预算', 'mentor': '导师课时'}
             for candidate in candidates:
-                candidate['selected'] = candidate['application_id'] in result['selected']
-                if not candidate['selected'] and not candidate['reasons']:
-                    candidate['reasons'] = ['预算、岗位剩余名额或同一学生只能入选一个岗位的约束']
+                candidate['selected'] = candidate['application_id'] in selection
+                if overcommitted and candidate.get('resource_cost'):
+                    candidate['reasons'].insert(0, '既有承诺已超过企业总预算，请先调整预算或处理原意向')
+                elif candidate['ready'] and not candidate['selected']:
+                    reasons = candidate['reasons']
+                    if candidate['student_id'] in chosen_students:
+                        reasons.append('该学生已建议分配至其他岗位')
+                    if chosen_counts[candidate['job_id']] >= jobs[candidate['job_id']]['capacity']:
+                        reasons.append('本版该岗位名额已分配完')
+                    reasons.extend(f'{resource_labels[key]}余额不足' for key, cost in candidate['resource_cost'].items()
+                                   if Decimal(str(cost)) - balances[key] > Decimal('0.000001'))
+                    if not reasons:
+                        reasons.append('本轮优化未将该组合纳入建议名单')
             versions = [json.loads(r['data'])['version'] for r in db.execute("SELECT data FROM entities WHERE kind='recruiting_plan' AND owner=?", (current['id'],)).fetchall()]
             data = {'version': max(versions, default=0) + 1, 'budget': total_budget, 'source_digest': digest,
                     'budget_scope': 'total', 'commitments': commitments, 'committed': committed,
@@ -385,3 +441,20 @@ def attach_recruiting_workflow(app, store, user, application_result):
                 'budget_changes': {k: {'before': before['budget'][k], 'after': after['budget'][k]} for k in before['budget'] if before['budget'][k] != after['budget'][k]},
                 'added': [c for c in after['candidates'] if c['selected'] and c['application_id'] not in before['result']['selected']],
                 'removed': [c for c in before['candidates'] if c['selected'] and c['application_id'] not in after['result']['selected']]}
+
+    @app.get('/api/recruiting/plans/{ident}/export')
+    def export_plan(ident: str, current=Depends(user)):
+        from backend.recruiting_export import plan_workbook
+
+        employer(current)
+        with store.connect() as db:
+            db.execute('BEGIN')
+            item = entity_row(db, ident, 'recruiting_plan')
+            if item['owner'] != current['id']:
+                raise HTTPException(403, '只能导出自己的招聘计划')
+            digest, _, applications = source_snapshot(current, db)
+            visible = {application['id'] for application in applications if not application['data'].get('withdrawn')}
+            visible_offers = {row['id'] for row in db.execute(
+                "SELECT id,data FROM entities WHERE kind='recruiting_offer' AND owner=?", (current['id'],))
+                if json.loads(row['data'])['application_id'] in visible}
+        return plan_workbook(item, item['data']['source_digest'] != digest, visible, visible_offers)

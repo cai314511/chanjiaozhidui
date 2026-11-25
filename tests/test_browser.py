@@ -52,7 +52,27 @@ def register(page, base, role, name, dismiss_exploration=True):
 
 
 def route(page, name):
-    page.locator(f'.nav [data-id="{name}"]').click()
+    nav = page.locator(f'.nav [data-id="{name}"]')
+    expect(page.locator('.nav [data-id=home]')).to_be_attached()
+    if nav.count():
+        nav.click()
+        return
+    current = page.locator('.nav-label').inner_text()
+    school = '高校端' in current
+    company = '企业端' in current
+    contexts = {
+        'weights': 'jobs', 'favorites': 'applications',
+        'students': 'home' if school else 'applications' if company else 'jobs',
+        'evidence': 'home' if school else 'documents',
+        'research': 'documents', 'curriculum': 'university-workspace', 'rules': 'decision',
+    }
+    if name not in contexts:
+        nav.click()
+        return
+    route(page, contexts[name])
+    control = (page.locator('.recruiting-job-list [data-action=weight-job]').first if name == 'weights'
+               else page.locator(f'.workspace-page-links [data-id="{name}"]'))
+    control.click()
 
 
 def test_real_browser_three_surfaces_and_live_weights(browser_system):

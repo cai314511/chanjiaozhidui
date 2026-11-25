@@ -1,7 +1,42 @@
 """演示空间使用真实API和隔离数据库，不接触真实账号。"""
 from fastapi.testclient import TestClient
+from io import BytesIO
+from openpyxl import load_workbook
 
 from backend.app import create_app
+
+
+def test_demo_recruiting_plan_changes_with_budget_and_exports(tmp_path):
+    with TestClient(create_app(tmp_path / 'formal')) as client:
+        assert client.post('/api/demo/enter').is_success
+        assert client.post('/api/demo/switch', json={'role': 'employer'}).is_success
+        ready = client.get('/api/recruiting/plans/readiness')
+        assert ready.is_success
+        assert ready.json()['eligible_students'] >= 2
+        assert ready.json()['blocked']
+        resources = {'training': 20000, 'mentor': 240}
+        large = client.post('/api/recruiting/plans', json={**resources, 'salary': 150000}).json()
+        small = client.post('/api/recruiting/plans', json={**resources, 'salary': 30000}).json()
+        assert (len(large['result']['selected']), len(small['result']['selected'])) == (4, 2)
+        comparison = client.get('/api/recruiting/plans/compare', params={'left': large['id'], 'right': small['id']})
+        assert comparison.is_success and comparison.json()['removed']
+        removed = {candidate['application_id'] for candidate in comparison.json()['removed']}
+        assert all('月度薪资预算余额不足' in row['reasons'] for row in small['candidates']
+                   if row['application_id'] in removed)
+        path = f"/api/recruiting/plans/{large['id']}/export"
+        download = client.get(path)
+        assert download.is_success
+        workbook = load_workbook(BytesIO(download.content), read_only=True)
+        assert workbook.sheetnames == ['招聘总览', '建议名单', '待办与未入选', '岗位名额', '既有承诺']
+        assert len(list(workbook['建议名单'].values)) == len(large['result']['selected']) + 1
+        own_review = next(row for row in large['candidates'] if row['student_name'] == '蔡雨轩')
+        assert client.post('/api/demo/switch', json={'role': 'student'}).is_success
+        assert client.get(path).status_code == 403
+        assert client.post(f"/api/applications/{own_review['application_id']}/withdraw").is_success
+        assert client.post('/api/demo/switch', json={'role': 'employer'}).is_success
+        stale = load_workbook(BytesIO(client.get(path).content), read_only=True)
+        rows = [*stale['建议名单'].values, *stale['待办与未入选'].values]
+        assert any(row[0] == '已撤回投递' and row[1] == own_review['job_title'] for row in rows)
 
 
 def test_demo_switch_retention_and_formal_isolation(tmp_path):

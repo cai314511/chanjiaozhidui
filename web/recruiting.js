@@ -1,20 +1,45 @@
 import {state,actions,api,post,on,e,fmt,button,heading,empty,dialog,closeDialog,refresh,navigate,resetIdentity,toast} from './core.js';
 import {companyBrand,bindCompanyBrands} from './company-brand.js';
 import {workflowPanel} from './recruiting-workflow.js';
+import {universityChartLibrary} from './university-intelligence.js';
 
 const statuses={draft:'草稿',published:'招聘中',paused:'已暂停',closed:'已结束'};
 const stages={new:'新投递',reviewing:'评估中',interview:'面试中',offer:'意向沟通（阶段标签）',declined:'暂不合适'};
-let charts=[],observer=null,chartSequence=0,messageTimer=null,selectedThread=null,qualificationFilter='',jobQualificationFilter='';
+let charts=[],observer=null,chartSequence=0,messageTimer=null,selectedThread=null,qualificationFilter='',jobQualificationFilter='',candidateJob='',demoChanging=false;
 function dispose(){chartSequence++;charts.forEach(c=>c.dispose());charts=[];observer?.disconnect();observer=null;clearTimeout(messageTimer);}
 window.addEventListener('navigate',dispose);
-window.addEventListener('identity-reset',()=>{dispose();selectedThread=null;});
+window.addEventListener('identity-reset',()=>{dispose();selectedThread=null;qualificationFilter='';candidateJob='';});
 
 async function changeDemo(path,body={}){
- await post('/demo/'+path,body);resetIdentity();state.user=null;state.jobs=[];state.applications=[];state.documents=[];
- state.demo=(await api('/demo/status')).active;
- try{state.user=await api('/auth/me');await refresh();}catch(error){if(state.demo)throw error;}
- closeDialog();document.querySelector('#app').dataset.identity='';navigate('home');
+ if(demoChanging)return;
+ demoChanging=true;
+ const toolbar=document.querySelector('.demo-toolbar');
+ if(toolbar){toolbar.setAttribute('aria-busy','true');toolbar.querySelectorAll('button').forEach(b=>b.disabled=true);}
+ const status=toolbar?.querySelector('.demo-status');
+ if(status)status.textContent='正在切换…';
+ else toast(path==='enter'?'正在准备演示空间…':'正在更新演示空间…');
+ let changed=false;
+ try{
+  const signal=AbortSignal.timeout(25000);
+  const result=await post('/demo/'+path,body,{signal});
+  changed=true;
+  resetIdentity();state.user=null;state.jobs=[];state.applications=[];state.documents=[];
+  state.demo=result.active;
+  try{state.user=await api('/auth/me',{signal});await refresh({signal});}catch(error){if(state.demo)throw error;}
+  closeDialog();document.querySelector('#app').dataset.identity='';navigate('home');
+ }catch(error){
+  if(changed){
+   closeDialog();document.querySelector('#page-content').innerHTML=
+    `<div class="panel"><h3>工作空间暂未加载完成</h3>${button('重新连接','demo-reconnect','','primary')}</div>`;
+  }
+  throw error.name==='TimeoutError'?new Error('连接超时，请重新打开演示空间或稍后重试。'):error;
+ }finally{
+  demoChanging=false;
+  if(toolbar){toolbar.removeAttribute('aria-busy');toolbar.querySelectorAll('button').forEach(b=>b.disabled=false);}
+  if(status)status.textContent='';
+ }
 }
+on('demo-reconnect',()=>location.reload());
 on('demo-enter',()=>changeDemo('enter'));
 on('demo-exit',()=>changeDemo('exit'));
 on('demo-role',el=>changeDemo('switch',{role:el.dataset.id}));
@@ -24,7 +49,7 @@ const formalLogout=actions.logout;
 on('logout',el=>state.demo?changeDemo('exit'):formalLogout(el));
 
 export function demoToolbar(){
- return state.demo?`<div class="demo-toolbar"><span class="demo-label">演示空间</span><div class="demo-roles">${[['student','学生'],['employer','企业'],['university','高校']].map(([r,n])=>`<button class="${state.user?.role===r?'selected':''}" data-action="demo-role" data-id="${r}">${n}</button>`).join('')}</div>${button('重置体验','demo-reset','','small')}${button('退出演示','demo-exit','','small')}</div>`:'';
+ return state.demo?`<div class="demo-toolbar"><span class="demo-label">演示空间</span><div class="demo-roles">${[['student','学生'],['employer','企业'],['university','高校']].map(([r,n])=>`<button class="${state.user?.role===r?'selected':''}" data-action="demo-role" data-id="${r}">${n}</button>`).join('')}</div><span class="demo-status" role="status"></span>${button('重置体验','demo-reset','','small')}${button('退出演示','demo-exit','','small')}</div>`:'';
 }
 
 export function employerInputHub(){return `<div class="input-hub">${button('上传JD与招聘资料','upload')}${button('语音讲述岗位','voice-intro')}${button('智能整理岗位要求','job-assistant')}</div>`;}
@@ -39,24 +64,38 @@ function stat(label,value,caption){return `<article class="metric"><span class="
 export async function recruitingHome(){
  const [company,candidates]=await Promise.all([api('/company/profile'),api('/recruiting/candidates')]);
  const apps=candidates.flatMap(c=>c.applications),jobs=state.jobs;
- return `<header class="intel-hero recruiting-hero"><div><span class="intel-kicker">TALENT × OPPORTUNITY · 企业招聘工作台</span><h2>${e(company.name||'企业招聘中心')}</h2><p>从岗位需求到人才选择，把每一次双向了解连接起来。</p><div class="inline">${button('发布新岗位','new-job','','primary')}${button('查看候选人','route','applications')}</div></div></header><div class="metrics">${stat('招聘中岗位',jobs.filter(j=>(j.status||'published')==='published').length,'当前开放投递')}${stat('候选人才',candidates.length,'按学生去重')}${stat('收到投递',apps.length,'跨岗位投递记录')}${stat('双向意向',state.applications.filter(a=>a.student_chosen&&a.employer_chosen).length,'双方均已选择')}</div><div class="recruiting-grid"><section class="panel"><h3>招聘阶段分布</h3><div class="recruiting-chart" data-recruit-chart="stages" role="img" aria-label="招聘阶段分布"></div></section><section class="panel"><h3>岗位投递与双向选择</h3><div class="recruiting-chart" data-recruit-chart="jobs" role="img" aria-label="岗位投递情况"></div></section></div><section class="panel"><div class="section-head"><div><span class="eyebrow">CANDIDATES</span><h3>值得进一步了解的人才</h3></div>${button('全部候选人','route','applications','small')}</div><div class="recruiting-candidates">${candidates.slice(0,4).map(candidateCard).join('')||empty('等待第一份投递','发布岗位后，候选人的授权资料会在这里汇总。')}</div></section><div id="recruit-chart-data" hidden data-stages="${e(JSON.stringify(Object.entries(stages).map(([k,name])=>({name,value:apps.filter(a=>a.stage===k).length}))))}" data-jobs="${e(JSON.stringify(jobs.map(j=>({name:j.title,count:apps.filter(a=>a.job_id===j.id).length,chosen:state.applications.filter(a=>a.job_id===j.id&&a.employer_chosen&&a.student_chosen).length}))))}"></div>`;
+ return `<header class="intel-hero recruiting-hero"><div><h2>${e(company.name||'企业招聘中心')}</h2>
+ <p>复核投递证据，按岗位名额和招聘预算生成建议名单。</p><div class="inline">
+ ${button('制定招聘计划','route','allocation','primary')}${button('查看候选人','route','applications')}${button('发布新岗位','new-job')}</div></div></header>
+ <div class="metrics">${stat('招聘中岗位',jobs.filter(j=>(j.status||'published')==='published').length,'当前开放投递')}${stat('候选人才',candidates.length,'按学生去重')}${stat('收到投递',apps.length,'跨岗位投递记录')}${stat('双向意向',state.applications.filter(a=>!a.withdrawn&&a.student_chosen&&a.employer_chosen).length,'双方均已选择')}</div>
+ <div class="recruiting-grid"><section class="panel"><h3>招聘阶段分布</h3><div class="recruiting-chart" data-recruit-chart="stages" role="img" aria-label="招聘阶段分布"></div></section>
+ <section class="panel"><h3>岗位投递与双向选择</h3><div class="recruiting-chart" data-recruit-chart="jobs" role="img" aria-label="岗位投递情况"></div></section></div>
+ <div id="recruit-chart-data" hidden data-stages="${e(JSON.stringify(Object.entries(stages).map(([k,name])=>({name,value:apps.filter(a=>a.stage===k).length}))))}"
+ data-jobs="${e(JSON.stringify(jobs.map(j=>({name:j.title,count:apps.filter(a=>a.job_id===j.id).length,chosen:state.applications.filter(a=>!a.withdrawn&&a.job_id===j.id&&a.employer_chosen&&a.student_chosen).length}))))}"></div>`;
 }
 
 export function employerJobs(){
- return heading('岗位管理','集中管理本公司的岗位发布、测评要求和招聘进展。',button('发布新岗位','new-job','','primary'))+`<div class="recruiting-job-list">${state.jobs.map(j=>{const apps=state.applications.filter(a=>a.job_id===j.id);return `<article class="panel job-card"><div class="section-head"><div><span class="tag">${statuses[j.status||'published']}</span><h3>${e(j.title)}</h3><p>${e(j.city)} · ${e(j.work_mode)} · ${fmt(j.salary_min)}–${fmt(j.salary_max)} 元/月</p></div><strong class="recruiting-count">${apps.length}<small>份投递</small></strong></div><p>${e(j.description.slice(0,150))}</p><div class="chips">${j.requirements.map(r=>`<span class="tag">${e(r.skill)}</span>`).join('')}</div><div class="inline">${button('编辑岗位','edit-job',j.id,'small')}${button('招聘偏好','weight-job',j.id,'small')}${button('候选人','route','applications','small')}<label class="recruit-status">发布状态<select data-job-status="${e(j.id)}">${Object.entries(statuses).map(([k,n])=>`<option value="${k}" ${(j.status||'published')===k?'selected':''}>${n}</option>`).join('')}</select></label></div></article>`;}).join('')||empty('发布第一个岗位','填写岗位职责、能力要求和招聘名额。',button('发布岗位','new-job'))}</div>`;
+ return heading('岗位管理','集中管理本公司的岗位发布、测评要求和招聘进展。',button('发布新岗位','new-job','','primary'))+`<div class="recruiting-job-list">${state.jobs.map(j=>{const apps=state.applications.filter(a=>a.job_id===j.id);return `<article class="panel job-card"><div class="section-head"><div><span class="tag">${statuses[j.status||'published']}</span><h3>${e(j.title)}</h3><p>${e(j.city)} · ${e(j.work_mode)} · ${fmt(j.salary_min)}–${fmt(j.salary_max)} 元/月</p></div><strong class="recruiting-count">${apps.length}<small>份投递</small></strong></div><p>${e(j.description.slice(0,150))}</p><div class="chips">${j.requirements.map(r=>`<span class="tag">${e(r.skill)}</span>`).join('')}</div><div class="inline">${button('编辑岗位','edit-job',j.id,'small')}${button('招聘偏好','weight-job',j.id,'small')}${button('查看该岗投递','candidate-job',j.id,'small')}<label class="recruit-status">发布状态<select data-job-status="${e(j.id)}">${Object.entries(statuses).map(([k,n])=>`<option value="${k}" ${(j.status||'published')===k?'selected':''}>${n}</option>`).join('')}</select></label></div></article>`;}).join('')||empty('发布第一个岗位','填写岗位职责、能力要求和招聘名额。',button('发布岗位','new-job'))}</div>`;
 }
 
 function candidateCard(c){
- const a=c.applications[0];
- return `<article class="recruit-candidate"><div class="inline"><span class="avatar">${e(c.name.slice(0,1))}</span><div><h4>${e(c.name)}</h4><p class="hint">${e(c.school)} · ${e(c.major)}</p></div>${c.favorite?'<span class="tag">已收藏</span>':''}</div><p>${e(c.career.slice(0,90))}</p><div class="chips">${c.applications.map(a=>`<span class="tag">${e(a.title)} · ${stages[a.stage]}</span>`).join('')}</div><div class="inline">${button('主页与简历','candidate-detail',c.id,'small primary')}${button(c.favorite?'取消收藏':'收藏人才',c.favorite?'candidate-unstar':'candidate-star',c.id,'small')}${button('联系','contact-person',c.id,'small')}</div>${a?`<div class="inline recruiting-quick">${button('测评复核','review',a.id,'small')}${button('双向匹配','application-detail',a.id,'small')}</div>`:''}</article>`;
+ return `<article class="recruit-candidate"><div class="inline"><span class="avatar">${e(c.name.slice(0,1))}</span><div><h4>${e(c.name)}</h4><p class="hint">${e(c.school)} · ${e(c.major)}</p></div>${c.favorite?'<span class="tag">已收藏</span>':''}</div><p>${e(c.career.slice(0,90))}</p><div class="inline">${button('主页与简历','candidate-detail',c.id,'small primary')}${button(c.favorite?'取消收藏':'收藏人才',c.favorite?'candidate-unstar':'candidate-star',c.id,'small')}${button('联系','contact-person',c.id,'small')}</div></article>`;
 }
 
 export async function candidatesPage(favorites=false){
- const all=await api('/recruiting/candidates?qualification_status='+encodeURIComponent(qualificationFilter)),items=favorites?all.filter(c=>c.favorite):all;
- const filter=`<div class="toolbar"><label>毕业与学历资格<select id="qualification-filter">${[['','全部资格状态'],['eligible','符合'],['excluded','不符合'],['pending','待核实']].map(([v,n])=>`<option value="${v}" ${qualificationFilter===v?'selected':''}>${n}</option>`).join('')}</select></label></div>`;
- const cards=items.map(c=>`<div class="recruiting-candidate-record">${candidateCard(c)}<div class="qualification-summary">${c.applications.map(a=>`<p><strong>${e(a.title)} · ${{eligible:'符合',excluded:'不符合',pending:'待核实'}[a.qualification.status]}</strong><span class="hint"> ${e(a.qualification.reasons.join('；')||'该岗位未限制毕业或学历资格')}</span>${button('邀约与正式意向','application-workflow',a.id,'small')}</p>`).join('')}</div></div>`).join('');
- return heading(favorites?'人才收藏':'候选人管理','按授权投递查看学生主页、项目作品与匹配情况。')+filter+`<div class="recruiting-candidates">${cards||empty(favorites?'还没有收藏的人才':'暂无符合筛选的候选人','学生提交授权材料后，可查看主页、收藏并联系。')}</div>`;
+ const all=await api('/recruiting/candidates?qualification_status='+encodeURIComponent(qualificationFilter));
+ const items=all.map(c=>({...c,applications:c.applications.filter(a=>!candidateJob||candidateJob===a.job_id)}))
+  .filter(c=>c.applications.length&&(!favorites||c.favorite));
+ const filter=`<div class="toolbar"><label>岗位<select id="candidate-job-filter"><option value="">全部岗位</option>
+ ${state.jobs.map(job=>`<option value="${e(job.id)}" ${candidateJob===job.id?'selected':''}>${e(job.title)}</option>`).join('')}</select></label>
+ <label>毕业与学历资格<select id="qualification-filter">${[['','全部资格状态'],['eligible','符合'],['excluded','不符合'],['pending','待核实']].map(([v,n])=>`<option value="${v}" ${qualificationFilter===v?'selected':''}>${n}</option>`).join('')}</select></label></div>`;
+ const cards=items.map(c=>`<div class="recruiting-candidate-record">${candidateCard(c)}<div class="qualification-summary">${c.applications.map(a=>`<div class="candidate-job-row">
+ <strong>${e(a.title)}</strong><small>${stages[a.stage]} · ${{eligible:'招聘条件已核验',excluded:'必要条件不符合',pending:'待复核'}[a.match.status]}</small>
+ <p class="hint">毕业与学历：${{eligible:'符合',excluded:'不符合',pending:'待核实'}[a.qualification.status]} ${e(a.qualification.reasons.join('；'))}</p>
+ <div class="inline">${button('测评复核','review',a.id,'small')}${button('双向匹配','application-detail',a.id,'small')}${button('邀约与正式意向','application-workflow',a.id,'small')}</div></div>`).join('')}</div></div>`).join('');
+ return heading(favorites?'人才收藏':'候选人管理','',favorites?button('全部候选人','route','applications','small'):button('制定招聘计划','route','allocation','primary'))+filter+`<div class="recruiting-candidates">${cards||empty(favorites?'当前筛选下没有收藏的人才':'暂无符合筛选的候选人','可以调整筛选条件。')}</div>`;
 }
+on('candidate-job',el=>{candidateJob=el.dataset.id;qualificationFilter='';navigate('applications');});
 
 on('candidate-detail',async el=>{
  const c=await api('/recruiting/candidates/'+el.dataset.id);
@@ -87,6 +126,8 @@ async function loadMessages(){
 }
 
 export async function bindRecruiting(){
+ const candidateFilter=document.querySelector('#candidate-job-filter');
+ candidateFilter?.addEventListener('change',()=>{candidateJob=candidateFilter.value;navigate(state.route);});
  bindCompanyBrands(document.querySelector('#page-content'));
  if(state.user?.role==='student'&&state.route==='jobs'){
   const epoch=state.sessionEpoch,rows=await api('/recruiting/job-qualifications');if(epoch!==state.sessionEpoch||state.route!=='jobs')return;
@@ -105,23 +146,46 @@ export async function bindRecruiting(){
   marker.outerHTML=panel;
  }
  const allocation=document.querySelector('#allocation-form');
- if(state.demo&&allocation){
-  allocation.elements.salary.value=state.jobs.reduce((s,j)=>s+j.salary_max*j.capacity,0);
-  allocation.elements.training.value=state.jobs.reduce((s,j)=>s+j.training_cost*j.capacity,0);
-  allocation.elements.mentor.value=state.jobs.reduce((s,j)=>s+j.mentor_hours*j.capacity,0);
+ if(state.demo&&allocation&&!allocation.elements.salary.value){
+  allocation.elements.salary.value=150000;
+  allocation.elements.training.value=20000;
+  allocation.elements.mentor.value=240;
  }
- document.querySelectorAll('[data-job-status]').forEach(s=>s.addEventListener('change',async()=>{try{await post('/recruiting/jobs/'+s.dataset.jobStatus+'/status',{status:s.value});await refresh();navigate(state.route);}catch(err){toast(err.message);}}));
+ document.querySelectorAll('[data-job-status]').forEach(select=>{
+  if(select.dataset.bound)return;
+  select.dataset.bound='true';
+  select.addEventListener('change',async()=>{
+   const previous=state.jobs.find(job=>job.id===select.dataset.jobStatus)?.status||'published';
+   select.disabled=true;
+   try{await post('/recruiting/jobs/'+select.dataset.jobStatus+'/status',{status:select.value});await refresh();navigate(state.route);}
+   catch(error){select.value=previous;toast(error.message);}
+   finally{select.disabled=false;}
+  });
+ });
  document.querySelectorAll('[data-application-stage]').forEach(s=>s.addEventListener('change',async()=>{try{await post('/recruiting/applications/'+s.dataset.applicationStage+'/stage',{stage:s.value});await refresh();toast('招聘阶段已更新');}catch(err){toast(err.message);}}));
  const form=document.querySelector('#direct-message-form');if(form){await loadMessages();form.addEventListener('submit',async event=>{event.preventDefault();const button=form.querySelector('button[type=submit]');button.disabled=true;try{await post('/conversations/'+selectedThread+'/messages',{text:form.elements.text.value});form.reset();await loadMessages();}catch(err){toast(err.message);}finally{button.disabled=false;}});}
- const data=document.querySelector('#recruit-chart-data');if(!data)return;
+ const data=document.querySelector('#recruit-chart-data');
+ if(data&&!data.dataset.chartsBound){
+  data.dataset.chartsBound='true';
+  renderRecruitingCharts(data).catch(error=>console.warn('招聘图表未完成',error));
+ }
+}
+async function renderRecruitingCharts(data){
  const sequence=chartSequence;
- if(!window.echarts)await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='/assets/vendor/echarts/echarts.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('图表运行库加载失败'));document.head.append(s);});
+ const hosts=[...document.querySelectorAll('[data-recruit-chart]')].map(host=>{
+  const stages=host.dataset.recruitChart==='stages';
+  const rows=JSON.parse(stages?data.dataset.stages:data.dataset.jobs).filter(row=>stages?row.value:row.count||row.chosen);
+  host.innerHTML=rows.length?`<ul class="recruit-chart-summary">${rows.map(row=>`<li>${e(row.name)} · ${stages?row.value+' 份':row.count+' 份投递 / '+row.chosen+' 条双向意向'}</li>`).join('')}</ul>`:empty('暂无招聘数据','收到有效投递后展示岗位进展。');
+  return {host,rows,stages};
+ }).filter(entry=>entry.rows.length);
+ if(!hosts.length)return;
+ let library;
+ try{library=await universityChartLibrary();}catch(error){console.warn(error.message);return;}
  if(!data.isConnected||sequence!==chartSequence)return;
  const palette=['#247b69','#719f97','#bd9c49','#436d79','#c0d4ce'];
- for(const host of document.querySelectorAll('[data-recruit-chart]')){
-  const chartRows=JSON.parse(host.dataset.recruitChart==='stages'?data.dataset.stages:data.dataset.jobs);
-  if(!chartRows.some(r=>host.dataset.recruitChart==='stages'?r.value>0:r.count>0||r.chosen>0)){host.innerHTML=empty('暂无招聘数据','收到有效投递后，这里将展示招聘阶段与岗位进展。');continue;}
-  const chart=window.echarts.init(host,null,{renderer:'canvas'});charts.push(chart);
+ for(const {host} of hosts){
+  host.replaceChildren();
+  const chart=library.init(host,null,{renderer:'canvas'});charts.push(chart);
   if(host.dataset.recruitChart==='stages')chart.setOption({color:palette,tooltip:{trigger:'item'},legend:{bottom:0},series:[{type:'pie',radius:['45%','72%'],center:['50%','44%'],itemStyle:{borderRadius:9,borderColor:'#f5faf5',borderWidth:4},label:{formatter:'{b}\n{c}份'},data:JSON.parse(data.dataset.stages),animationDuration:950}]});
   else{const rows=JSON.parse(data.dataset.jobs);chart.setOption({color:[palette[0],palette[2]],tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},legend:{bottom:0},grid:{left:25,right:15,top:20,bottom:65,containLabel:true},xAxis:{type:'category',data:rows.map(r=>r.name),axisLabel:{rotate:25,fontSize:10}},yAxis:{type:'value',minInterval:1},series:[{name:'收到投递',type:'bar',barMaxWidth:24,data:rows.map(r=>r.count),itemStyle:{borderRadius:[5,5,0,0]}},{name:'双向意向',type:'bar',barMaxWidth:24,data:rows.map(r=>r.chosen),itemStyle:{borderRadius:[5,5,0,0]}}]});}
  }

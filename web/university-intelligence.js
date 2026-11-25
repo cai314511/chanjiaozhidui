@@ -22,8 +22,10 @@ function library(){
  if(libraryPromise)return libraryPromise;
  libraryPromise=new Promise((resolve,reject)=>{
   const script=document.createElement('script');script.src='/assets/vendor/echarts/echarts.min.js';script.async=true;
-  script.onload=()=>window.echarts?resolve(window.echarts):reject(new Error('图表运行库加载后不可用'));
-  script.onerror=()=>{script.remove();libraryPromise=null;reject(new Error('本地图表运行库加载失败，请刷新页面重试'));};
+  const fail=()=>{clearTimeout(timer);script.remove();libraryPromise=null;reject(new Error('图表加载未完成，请刷新重试'));};
+  const timer=setTimeout(fail,12000);
+  script.onload=()=>{if(!window.echarts){fail();return;}clearTimeout(timer);resolve(window.echarts);};
+  script.onerror=fail;
   document.head.append(script);
  });return libraryPromise;
 }
@@ -35,11 +37,11 @@ function content(data){
  const s=data.summary||{},meta=data.source_meta||{};
  return `<header class="intel-hero"><div><span class="intel-kicker">INDUSTRY × EDUCATION · 高校产业与人才观察</span><h2>从企业需求，看见培养的下一步</h2><p>结合历史招聘样本、平台真实岗位与本校能力证据，观察需求结构和人才供给。</p></div><span class="intel-signal"><i></i>每60秒更新平台数据</span></header>
  <form id="university-intel-filter" class="intel-filter"><label>产业赛道<select name="track">${optionList(data.filters?.tracks,selected.track,'全部赛道')}</select></label><label>工作城市<select name="city">${optionList(data.filters?.cities,selected.city,'全部城市')}</select></label><button type="submit" class="btn primary">联动分析</button>${button('刷新数据','university-intel-refresh','','small')}<span id="university-intel-status" aria-live="polite">统计更新于 ${e(formatTime(data.generated_at))}</span></form>
- <div class="intel-metrics">${[['历史相关公告',s.historical_postings,'历史样本，非当前空缺'],['平台真实岗位',s.live_postings,'来自企业当前发布'],['相关企业',s.companies,'所选范围内企业'],['本校学生样本',s.student_count,data.student_suppressed?'小样本已隐藏':'已纳入本校分析']].map(([label,value,note])=>`<article><span>${label}</span><strong>${valueLabel(value)}</strong><small>${note}</small></article>`).join('')}</div>
+ <div class="intel-metrics">${[['历史招聘公告',s.historical_postings,'按观察期统计'],[state.demo?'演示空间岗位':'站内招聘岗位',s.live_postings,'当前开放投递'],['相关企业',s.companies,'所选范围内企业'],[state.demo?'演示学生样本':'本校学生样本',s.student_count,data.student_suppressed?'小样本已隐藏':'已纳入本次分析']].map(([label,value,note])=>`<article><span>${label}</span><strong>${valueLabel(value)}</strong><small>${note}</small></article>`).join('')}</div>
  <div class="intel-basis"><span>历史观察期：${e(data.history_period||'尚无可用历史样本')}</span><span>已读取 ${fmt(meta.scanned_rows||0)} 条原始记录</span><span>当前筛选：${e(selected.track||'全部赛道')} · ${e(selected.city||'全部城市')}</span></div>
  <div class="intel-grid">${chartPanel('trend','需求沿时间的变化','按原始发布日期的月份汇总；点击图例或拖动缩放查看观察期。',true)}${chartPanel('sectors','产业需求的结构','赛道关联公告条数；点击柱形可联动筛选全页。')}${chartPanel('skills','企业正在寻找什么能力','历史公告与平台岗位分别计数，比较技能提及频次。')}${chartPanel('radar','能力目标与本校证据','使用0—5级的真实岗位目标与本校学生能力均值；仅展示达到样本要求的维度。')}${chartPanel('coverage','从技能需求连接课程','课程中已明确映射到该技能的课程数量；缺少映射不计为零。')}${chartPanel('network','产业与技能的需求网络','连线表示历史公告中的赛道—技能同现次数，可拖动节点及滚轮缩放。',true)}${chartPanel('goals','本校学生正在走向哪里','仅显示达到最小样本要求的职业目标分组。',true)}</div>
  <section class="intel-panel intel-next"><div><span class="intel-kicker">从观察到培养行动</span><h3>把课程依据接入，再比较调整方案</h3><p>用本校课程与技能映射核对覆盖关系，结合明确的教学资源和岗位目标制定方案。</p></div><div class="inline">${button('导入本校课程','university-import','courses','primary')}${button('本校课程库','university-course-library')}${button('培养方案优化','route','curriculum')}${button('专业调整决策','route','decision')}</div></section>
- <details class="intel-panel intel-method"><summary>统计范围、来源与样本说明</summary><ul>${(data.notes||[]).map(note=>`<li>${e(note)}</li>`).join('')}</ul><p>历史资料由本机导入，不代表实时全市场招聘需求。平台岗位和本校数据按当前服务记录更新。</p>${(meta.sources||[]).map(source=>`<p><strong>${e(source.name)}</strong> · ${fmt(source.scanned_rows||0)} 条读取记录</p><p class="hash">SHA-256 ${e(source.sha256||'未提供')}</p>`).join('')}<p>图表：本地 Apache ECharts 6.0.0 · Canvas 渲染。</p></details>`;
+ <details class="intel-method"><summary>数据来源</summary>${(meta.sources||[]).map(source=>`<p>${e(source.name)} · ${fmt(source.scanned_rows||0)} 条原始记录</p>`).join('')}</details>`;
 }
 function formatTime(value){if(!value)return '尚未生成';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString('zh-CN',{hour12:false});}
 

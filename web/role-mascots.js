@@ -6,21 +6,21 @@ const images=new Map();
 let current=null,entryController=null,observer=null,requestVersion=0;
 
 function audience(){return state.user?state.user.role:'guest';}
-async function loadPool(target){
+async function loadPool(target,entry=false){
  const pool=target==='guest'?Object.keys(roles):roles[target]?[target]:[];
- const ready=await Promise.all(pool.map(load));
+ const ready=await Promise.all(pool.map(role=>load(role,entry)));
  return pool.filter((role,index)=>ready[index]);
 }
 function sample(pool){return pool[Math.floor(Math.random()*pool.length)];}
 
-function load(role){
- if(!images.has(role))images.set(role,new Promise(resolve=>{
+function load(role,entry){
+ const path=`/assets/mascots/${role}${entry?'-entry.webp':'.png'}`;
+ if(!images.has(path))images.set(path,new Promise(resolve=>{
   const image=new Image();
-  image.onload=()=>resolve(true);
-  image.onerror=()=>resolve(false);
-  image.src=`/assets/mascots/${role}.png`;
+  image.src=path;
+  image.decode().then(()=>resolve(true),()=>resolve(false));
  }));
- return images.get(role);
+ return images.get(path);
 }
 
 function setCell(layer,cell,role){
@@ -112,16 +112,16 @@ export function bindRoleMascots(){
  if(target!=='guest'&&!roles[target]){
   stopEntry();delete entry.dataset.mascotAudience;
   delete entry.dataset.mascotRole;delete entry.dataset.mascotReady;
-  entry.classList.remove('mascot-entry');entry.textContent='✦';entry.removeAttribute('title');stopHome();
+  entry.classList.remove('mascot-entry');entry.textContent='✦';entry.hidden=false;entry.removeAttribute('title');stopHome();
  }else{
   // 同一身份重绘不重启入口轮播；身份变化立即撤下旧角色。
   if(entryController&&(entryController.audience!==target||entryController.epoch!==epoch))stopEntry();
   if(!entryController){
-   entry.textContent='✦';entry.classList.remove('mascot-entry');delete entry.dataset.mascotRole;
+   entry.hidden=true;entry.textContent='';entry.classList.remove('mascot-entry');delete entry.dataset.mascotRole;delete entry.dataset.mascotReady;
   }
   entry.dataset.mascotAudience=target;
   entry.title=target==='guest'?'登录后与精灵交流':roles[target]+' · 打开智能助手';
-  loadPool(target).then(pool=>{
+  loadPool(target,true).then(pool=>{
    if(version!==requestVersion||epoch!==state.sessionEpoch||audience()!==target)return;
    const ready=pool.length>0;
    entry.dataset.mascotReady=String(ready);entry.classList.toggle('mascot-entry',ready);
@@ -134,6 +134,8 @@ export function bindRoleMascots(){
     entryController={kind:'entry',stage:entry,role,audience:target,pool,epoch,layers,pose:0,front:0,timer:null,frame:null};
     schedule(entryController);if(document.hidden)visibility();
    }
+   if(!ready)entry.textContent='✦';
+   entry.hidden=false;
    reconcile();
   });
  }
