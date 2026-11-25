@@ -2,6 +2,7 @@ import {state,e,api,post,on,toast,dialog,closeDialog,refresh,navigate,button} fr
 import {openAssistant} from './assistant.js';
 import {ContinuousTranscriber} from './transcription.js';
 import {arrangeVoice} from './voice-layout.js';
+import {DeviceSpeech} from './device-speech.js';
 
 let active=null,stream=null,recording=false,playback,playbackUrl;
 let lastVoice=0,automaticTimer,peer=null,pollTimer,signalCursor=0;
@@ -9,13 +10,14 @@ let dictation=null,callStream=null;
 let liveTranscriber=null,playbackContext=null,playbackFrame;
 let playbackGeneration=0,finishPlayback=null;
 let waterOrb=null;
+const deviceSpeech=new DeviceSpeech();
 const transcriptDrafts=new Map();
 let captureEpoch=0;
-function cancelPlayback(){playbackGeneration++;playback?.pause();finishPlayback?.();finishPlayback=null;cancelAnimationFrame(playbackFrame);playbackContext?.close();playbackContext=null;waterOrb?.setVolume(0)}
+function cancelPlayback(){playbackGeneration++;deviceSpeech.cancel();playback?.pause();finishPlayback?.();finishPlayback=null;cancelAnimationFrame(playbackFrame);playbackContext?.close();playbackContext=null;waterOrb?.setVolume(0)}
 const modal=()=>document.querySelector('#modal');
 function valid(session){return active===session&&state.sessionEpoch===session.epoch&&modal().open;}
 function setStatus(mode,text){const stage=document.querySelector('.droplet-stage');if(stage)stage.dataset.mode=mode;waterOrb?.setMode(mode);const el=document.querySelector('#voice-status');if(el)el.textContent=text;const mic=document.querySelector('#voice-mic');if(mic){mic.setAttribute('aria-pressed',String(mode==='listening'));mic.setAttribute('aria-label',mode==='listening'?'停止录音':'开始录音')}}
-async function checkedFetch(path,body,session){const response=await fetch('/api'+path,{method:'POST',credentials:'same-origin',headers:body instanceof FormData?{}:{'Content-Type':'application/json'},body:body instanceof FormData?body:JSON.stringify(body)});if(!valid(session))throw new DOMException('访谈已关闭','AbortError');if(!response.ok){const data=await response.json();throw new Error(typeof data.detail==='string'?data.detail:'语音请求失败');}return response;}
+async function checkedFetch(path,body,session){const response=await fetch('/api'+path,{method:'POST',credentials:'same-origin',headers:body instanceof FormData?{}:{'Content-Type':'application/json'},body:body instanceof FormData?body:JSON.stringify(body)});if(!valid(session))throw new DOMException('访谈已关闭','AbortError');if(!response.ok){const data=await response.json();const error=new Error(typeof data.detail==='string'?data.detail:'语音请求失败');error.status=response.status;throw error;}return response;}
 export function stopVoice(){
  const transcript=document.querySelector('#voice-transcript');
  if(active?.draftKey&&transcript){transcriptDrafts.set(active.draftKey,transcript.value);if(transcriptDrafts.size>20)transcriptDrafts.delete(transcriptDrafts.keys().next().value);}
@@ -37,7 +39,25 @@ async function localSpeak(text,session){
  if(!valid(session))return;
  if(recording)await pauseRecording();
  cancelPlayback();const generation=playbackGeneration;setStatus('thinking','正在准备语音');
- const response=await checkedFetch('/voice/speak',{text:text.slice(0,1800)},session);
+ document.querySelector('#voice-error').textContent='';
+ let capabilities;
+ try{capabilities=session.voiceCapabilities||await api('/voice/status')}
+ catch(error){if(!valid(session)||generation!==playbackGeneration)return;throw error}
+ if(!valid(session)||generation!==playbackGeneration)return;
+ session.voiceCapabilities=capabilities;
+ let response;
+ if(capabilities.synthesis_ready){
+  try{response=await checkedFetch('/voice/speak',{text:text.slice(0,1800)},session)}
+  catch(error){if(error.status!==503)throw error;session.voiceCapabilities={...capabilities,synthesis_ready:false}}
+ }
+ if(!valid(session)||generation!==playbackGeneration)return;
+ if(!response){
+  document.querySelector('.voice-state-note').textContent='使用此设备的本地中文语音朗读 · 录音发送至本站服务识别';
+  try{await deviceSpeech.speak(text.slice(0,1800),()=>{if(valid(session)&&generation===playbackGeneration)setStatus('speaking','正在回答 · 设备中文朗读')})}
+  catch(error){if(generation!==playbackGeneration||error.name==='AbortError')return;if(error.name==='NotAllowedError'){setStatus('idle',error.message);return}throw error}
+  if(valid(session)&&generation===playbackGeneration){setStatus('idle','轮到你了，可以开始讲述');if(document.querySelector('#voice-auto')?.checked&&!session.data.completed)await startRecording(session)}
+  return;
+ }
  const blob=await response.blob();if(!valid(session)||generation!==playbackGeneration)return;
  if(playbackUrl)URL.revokeObjectURL(playbackUrl);playbackUrl=URL.createObjectURL(blob);playback=new Audio(playbackUrl);
  try{
@@ -46,10 +66,10 @@ async function localSpeak(text,session){
   playbackContext.createMediaElementSource(playback).connect(analyser);analyser.connect(playbackContext.destination);
   const samples=new Uint8Array(256);cancelAnimationFrame(playbackFrame);
   const animate=()=>{if(!valid(session)||playback.paused)return;analyser.getByteTimeDomainData(samples);const level=Math.sqrt(samples.reduce((s,v)=>s+((v-128)/128)**2,0)/samples.length);waterOrb?.setVolume(Math.min(1,level*8));playbackFrame=requestAnimationFrame(animate)};
-  const ended=new Promise(resolve=>{finishPlayback=resolve;playback.onended=resolve;playback.onerror=resolve;});
-  await playback.play();if(generation!==playbackGeneration)return;setStatus('speaking','正在回答');animate();await ended;
+  const ended=new Promise(resolve=>{finishPlayback=resolve;playback.onended=()=>resolve(true);playback.onerror=()=>resolve(false);});
+  await playback.play();if(generation!==playbackGeneration)return;setStatus('speaking','正在回答');animate();const completed=await ended;if(completed===false)throw new Error('播报音频无法播放，请点击“重播问题”重试');
  }
- catch(err){if(generation!==playbackGeneration||err.name==='AbortError')return;if(valid(session)){setStatus('idle','浏览器尚未允许播报，请点击“重播问题”');return;}}
+ catch(err){if(generation!==playbackGeneration||err.name==='AbortError')return;if(valid(session)&&err.name==='NotAllowedError'){setStatus('idle','浏览器尚未允许播报，请点击“重播问题”');return;}throw err;}
  if(valid(session)&&generation===playbackGeneration){finishPlayback=null;setStatus('idle','轮到你了，可以开始讲述');if(document.querySelector('#voice-auto')?.checked&&!session.data.completed)await startRecording(session);}
 }
 function paint(session){
@@ -77,6 +97,7 @@ async function openSession(data){
  stopVoice();active={data,epoch:state.sessionEpoch,draftKey:state.user.id+':'+data.id};const session=active;
  dialog(data.mode==='profile'?'聊聊你的经历':data.mode==='human'?'企业真人面试':'岗位语音面试',`<div class="interview-layout"><div><div class="droplet-stage" data-mode="idle"><div class="droplet" aria-hidden="true"></div></div><div id="voice-status" class="voice-status" role="status">${data.mode==='human'?'等待双方接通':'已准备好，本地识别与播报'}</div><div class="voice-controls"><button class="mic-button" id="voice-mic" aria-label="开始或停止录音">◉</button><button class="btn" id="voice-replay">重播问题</button>${data.mode==='human'?'<button class="btn" id="human-connect">接通音频</button>':''}</div><p class="voice-state-note">${data.mode==='human'?'真人音频直接连接双方设备':'音频在本机处理 · 转写可修改'}</p><label class="check"><input type="checkbox" id="voice-auto"><span>连续对话：停顿后自动发送本轮转写</span></label>${['ai','profile'].includes(data.mode)?'<label class="check"><input type="checkbox" id="voice-consent"><span>同意将本次核对的转写发给 DeepSeek，用于面试追问</span></label>':''}</div><div><div id="voice-messages" class="voice-messages" aria-live="polite"></div><div class="field"><label>本轮实时转写，可直接修改<textarea id="voice-transcript" class="voice-transcript" placeholder="开始说话，识别结果会出现在这里…" maxlength="6000"></textarea></label></div><div class="inline"><button class="btn primary" id="voice-send">确认并回答</button><button class="btn" id="voice-summary">整理为个人介绍</button></div><p class="hint" id="voice-error"></p></div></div><audio id="remote-audio" autoplay controls hidden></audio>`);
  modal().classList.add('voice-dialog');arrangeVoice(modal());paint(session);
+ document.querySelector('.voice-state-note').textContent=data.mode==='human'?'真人音频直接连接双方设备':'录音发送至本站服务识别 · 转写可修改';
  document.querySelector('#voice-transcript').value=transcriptDrafts.get(session.draftKey)||'';
  const interactionRoot=modal().querySelector('.interview-layout');
  interactionRoot.addEventListener('pointerdown',()=>session.interacted=true,{once:true});

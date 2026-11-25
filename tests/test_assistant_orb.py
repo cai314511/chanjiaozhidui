@@ -75,9 +75,13 @@ def test_assistant_glass_in_actual_panel_dimensions(browser_system):
     folder.mkdir(parents=True, exist_ok=True)
     page.locator('#agent-drawer').screenshot(path=str(folder / 'assistant-panel-desktop.png'))
     stage.screenshot(path=str(folder / 'assistant-stage-desktop.png'))
-    # 水滴置于标题栏，给对话和始终可见的输入区留出空间。
-    assert 24 <= stage.bounding_box()['width'] <= 56
-    expect(page.locator('.drawer-head .agent-orb-stage')).to_have_count(1)
+    # 当前交互将大水滴置于模式栏下方居中，同时保留始终可见的输入区。
+    box, drawer = stage.bounding_box(), page.locator('#agent-drawer').bounding_box()
+    assert 140 <= box['width'] <= drawer['width']
+    assert abs(box['x'] + box['width'] / 2 - drawer['x'] - drawer['width'] / 2) < 20
+    tabs = page.get_by_role('tablist', name='助手模式').bounding_box()
+    assert box['y'] >= tabs['y'] + tabs['height']
+    expect(page.locator('.drawer-head .agent-orb-stage')).to_have_count(0)
     for selector in ['#agent-form textarea', '#agent-form .agent-speech', '#agent-form [type=submit]']:
         box = page.locator(selector).bounding_box()
         assert box['y'] >= 0 and box['y'] + box['height'] <= 960

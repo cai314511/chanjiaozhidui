@@ -139,7 +139,9 @@ curl --silent --output /dev/null --write-out '%{http_code}\n' http://127.0.0.1:8
 ## 语音与已有参考数据
 
 - XLSX导入、诊断图表、四年决策计算不依赖DeepSeek Key；只有模型助手调用需要有效配置。
-- Whisper识别需要服务器上的完整模型目录，并通过进程环境配置`CHZ_WHISPER_MODEL`。`backend/voice.py`不单独读取`.env`中的这个变量；systemd可使用原服务的`EnvironmentFile`，手动运行可先`export CHZ_WHISPER_MODEL=/实际模型目录`。浏览器麦克风权限通常要求HTTPS或localhost；公网HTTP下可能只能打字。Windows SAPI语音合成不能直接用于Linux，云端不会因拉取代码自动获得Windows语音能力。
+- SenseVoice 转写在 EC2 服务进程中运行。将项目根目录 `.env` 中的 `CHZ_ASR_MODEL` 指向完整的 `models/SenseVoiceSmall` 目录，进程里同名环境变量优先。模型权重在服务器单独保存。在运行 Uvicorn 的同一个 Python 环境中安装 `requirements-sensevoice.txt`，随后沿用原方式重启服务。Whisper 可继续通过配置完整的模型目录使用。
+- 在项目目录用服务的 Python 执行 `python -c "from backend.voice import status; print(status())"`，确认 `recognition_ready` 为 `True`。再在免登录体验的语音窗口实录一句中文，核对转写内容。首次实际转写成功后，登录态 `/api/voice/status` 的 `recognition_loaded` 应为 `True`。
+- Linux 服务器的 `synthesis_ready: false` 对应浏览器设备朗读。更新代码后点击“重播问题”，使用设备已安装的本地中文语音包。公网麦克风录音需要可信 HTTPS，直接通过 `http://公网IP:8765` 登录时可继续用文字回答。
 - 新版参考包会随Git更新，但应用只为缺失的固定公共记录补齐数据，不覆盖云端已存在的聚合。更新代码不会重算历史数据。服务器若持有两份原始CSV，需要刷新全行业目录或高校需求时，可按原流程分别执行`.venv/bin/python scripts/import_market.py`和`.venv/bin/python scripts/import_demand.py`，缺少默认路径时用`--csv`显式指定；脚本各自先备份。不要把公告条数当招聘人数，也不要把本机账号库复制到云端。
 
 连接实例参考：[AWS EC2官方文档](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/connect-to-linux-instance.html)。systemd命令可在服务器通过`man systemctl`核对。

@@ -66,11 +66,15 @@ def attach_experience(app, store, user, role, owned, entity, flat, application_a
 
     @app.post('/api/voice/speak')
     def voice_speak(payload: Speech, current=Depends(user)):
-        from backend.voice import synthesize
+        from backend.voice import synthesize, VoiceUnavailable
         try:
             content = synthesize(payload.text, store.root)
-        except (ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            raise HTTPException(503, '本地中文语音合成未完成，请检查中文语音组件：' + type(exc).__name__)
+        except VoiceUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(503, '服务器中文朗读不可用，请使用浏览器设备中文语音或继续文字回答') from exc
         return Response(content, media_type='audio/wav')
 
     @app.put('/api/jobs/{ident}/priorities')

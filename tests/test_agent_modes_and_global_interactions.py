@@ -129,6 +129,8 @@ def test_enter_sends_direct_message(browser_system):
 def test_voice_text_enter_keeps_consent_guard_and_outside_close_keeps_transcript(browser_system):
     browser, base = browser_system
     page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    # 模拟无系统朗读能力的设备；播报失败后仍应保留转写和授权流程。
+    page.add_init_script("Object.defineProperty(window,'speechSynthesis',{value:null})")
     page.route('**/api/voice/speak', lambda route: route.fulfill(status=503, json={'detail': '隔离播报，不测试扬声器'}))
     sent = []
 
@@ -144,13 +146,13 @@ def test_voice_text_enter_keeps_consent_guard_and_outside_close_keeps_transcript
     ident = pending.value.json()['id']
     transcript = page.locator('#voice-transcript')
     expect(transcript).to_be_visible()
-    expect(page.locator('#voice-error')).to_contain_text('隔离播报')
+    expect(page.locator('#voice-error')).to_contain_text('不支持设备朗读')
     transcript.fill('关闭后保留本轮转写')
     page.mouse.click(5, 150)
     expect(page.locator('#modal')).not_to_be_visible()
     page.evaluate("async id=>{const {actions}=await import('/assets/core.js');await actions['join-interview']({dataset:{id}})}", ident)
     expect(transcript).to_have_value('关闭后保留本轮转写')
-    expect(page.locator('#voice-error')).to_contain_text('隔离播报')
+    expect(page.locator('#voice-error')).to_contain_text('不支持设备朗读')
     transcript.press('Enter')
     expect(page.locator('#voice-error')).to_contain_text('请确认允许')
     assert sent == []

@@ -136,7 +136,7 @@ Windows本地求解使用HiGHS单线程配置，避免原生并行求解的访�
 
 个人资料库也支持选择导入桌面ZIP中的单个文件，不会读取下载中的文件。超过12MB的上传材料需按实际内容拆分。共享研究证据通过登录后的只读接口展示，原始文件、数据库和账号密码不通过静态地址访问。
 
-语音支持本地 SenseVoiceSmall 或 Whisper 识别与 Windows 中文 SAPI 合成，支持分段转写、水滴面试、预设问题及真人会话入口。SenseVoice 可选依赖通过 `python -m pip install -r requirements-sensevoice.txt` 安装，权重另存 `models/SenseVoiceSmall`，使用 `.env` 中的 `CHZ_ASR_MODEL` 指定；权重不随 Git 上传，运行时不自动下载。转写可以修改；AI面试需要确认将转写发送给 DeepSeek。系统依据实际经历和行为证据整理建议，不从音色推断人格。配置、运行条件和验证范围见[本地语音与交互说明](docs/本地语音与交互说明.md)。
+语音支持服务端 SenseVoiceSmall 或 Whisper 识别；朗读在 Windows 服务器优先使用中文 SAPI，Linux/AWS 或服务器合成不可用时，使用访问者设备的本地中文语音包。设备缺少中文语音时提示安装，仍可录音或文字回答；浏览器阻止自动朗读时点击“重播问题”。支持分段转写、水滴面试、预设问题及真人会话入口。SenseVoice 可选依赖通过 `python -m pip install -r requirements-sensevoice.txt` 安装，权重另存 `models/SenseVoiceSmall`，使用 `.env` 中的 `CHZ_ASR_MODEL` 指定；权重不随 Git 上传，运行时不自动下载。录音通过本站接口发送到部署服务器识别，转写可以修改；AI面试需要确认将转写发送给 DeepSeek。系统依据实际经历和行为证据整理建议，不从音色推断人格。配置、运行条件和验证范围见[本地语音与交互说明](docs/本地语音与交互说明.md)。
 
 ## 权限与数据
 

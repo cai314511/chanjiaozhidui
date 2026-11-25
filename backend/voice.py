@@ -67,8 +67,8 @@ def status():
     return {'recognition_ready': ready, 'synthesis_ready': os.name == 'nt',
             'recognition': ('SenseVoiceSmall' if engine == 'sensevoice' else 'Whisper' if engine else '本地语音未配置') + ' · 本机 CPU',
             'recognition_loaded': loaded, 'recognition_error': error,
-            'synthesis': 'Windows 本地语音',
-            'audio_leaves_device': False}
+            'synthesis': 'Windows 服务器本地语音' if os.name == 'nt' else '使用浏览器设备中文语音',
+            'audio_leaves_device': True}
 
 
 def _load_model(engine, path):
@@ -135,7 +135,7 @@ def synthesize(text, root):
     if not text.strip() or len(text) > 1800:
         raise ValueError('播报文字长度需要在1至1800字符之间')
     if os.name != 'nt':
-        raise ValueError('当前合成服务需要 Windows 本地语音组件')
+        raise VoiceUnavailable('此服务器未提供 Windows 中文朗读，请使用浏览器设备的本地中文语音')
     folder = root / 'voice'
     folder.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(dir=folder) as directory:
